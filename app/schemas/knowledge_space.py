@@ -36,7 +36,7 @@ class KnowledgeSpaceReadDetail(KnowledgeSpaceRead):
     updated_by: str | None = None
     deleted_at: datetime | None = None
     deleted_by: str | None = None
-    tenant: "TenantRead | None" = None
+    tenant: "TenantRead"
 
 
 class KnowledgeSpaceCreate(SQLModel):

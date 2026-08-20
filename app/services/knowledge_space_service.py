@@ -74,10 +74,14 @@ class KnowledgeSpaceService:
             tenant_id=tenant_id,
             created_by=user.username
         )
-        self.knowledge_repository.create_knowledge_space(session=session, knowledge_space=knowledge_space)
+        self.knowledge_repository.create_knowledge_space(session=session, knowledge_space=knowledge_space_db)
 
         session.commit()
-        session.refresh(knowledge_space_db)
+
+        knowledge_space_db = self.knowledge_repository.get_knowledge_space(
+            session=session,
+            knowledge_space_id=knowledge_space_db.id
+        )
 
         self.logger.info(f"Knowledge Space {knowledge_space_db.name} creado con éxito | SQL ID: {knowledge_space_db.id}")
         return KnowledgeSpaceSchema.KnowledgeSpaceReadDetail.model_validate(knowledge_space_db)
@@ -101,7 +105,11 @@ class KnowledgeSpaceService:
 
         self.knowledge_repository.update_knowledge_space(session=session, knowledge_space=knowledge_space_db)
         session.commit()
-        session.refresh(knowledge_space_db)
+
+        knowledge_space_db = self.knowledge_repository.get_knowledge_space(
+            session=session,
+            knowledge_space_id=knowledge_space_id
+        )
 
         self.logger.info(f"Knowledge Space {knowledge_space_db.name} actualizado | SQL ID: {knowledge_space_db.id}")
         return KnowledgeSpaceSchema.KnowledgeSpaceReadDetail.model_validate(knowledge_space_db)
