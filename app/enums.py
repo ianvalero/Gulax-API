@@ -7,10 +7,16 @@ class CollectionDistance(StrEnum):
 
 class DocumentVersionStatus(StrEnum):
     PENDING = "PENDING"
-    PROCESSING = "PROCESSING"
     ACTIVE = "ACTIVE"
     FAILED = "FAILED"
     ARCHIVED = "ARCHIVED"
+
+
+class IngestionRunStatus(StrEnum):
+    PENDING = "PENDING"
+    PROCESSING = "PROCESSING"
+    COMPLETED = "COMPLETED"
+    FAILED = "FAILED"
 
 
 class SortDirection(StrEnum):
@@ -40,9 +46,9 @@ class KnowledgeSpaceSortField(StrEnum):
 
 class DocumentSortField(StrEnum):
     ID = "id"
-    COLLECTION_ID = "collection_id"
-    COLLECTION_GULAX_NAME = "collection_gulax_name"
+    KNOWLEDGE_SPACE__ID = "knowledge_space_id"
+    KNOWLEDGE_SPACE_NAME = "knowledge_spac_name"
     DESCRIPTION = "description"
-    COLLECTION_ROLES = "collection_roles"
+    TENANT_ROLES = "tenant_roles"
     CREATED_AT = "created_at"
     CREATED_BY = "created_by"

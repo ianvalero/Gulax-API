@@ -67,7 +67,7 @@ class TenantService:
         tenant_db = TenantDB(
             name=new_tenant.name,
             description=new_tenant.description,
-            is_global=new_tenant.is_global,
+            is_global_retrieval=new_tenant.is_global,
             roles=new_tenant.roles,
             created_by=user.username
         )

@@ -12,7 +12,7 @@ from app.schemas.user import User
 
 
 router = APIRouter(prefix="/api/documents", tags=["Documents"])
-create_document_router = APIRouter(prefix="/api/collections", tags=["Documents"])
+create_document_router = APIRouter(prefix="/api/knowledge-spaces", tags=["Documents"])
 
 @router.get(
     "",
@@ -51,12 +51,12 @@ async def get_document(
     return await document_service.get_document(session=session, user=user, document_id=document_id)
 
 @create_document_router.post(
-"/{collection_id}/documents",
+"/{knowledge_space_id}/documents",
     response_model=DocumentSchema.DocumentRead,
     status_code=status.HTTP_201_CREATED,
     summary="Create new document")
 async def upload_document(
-    collection_id: int,
+    knowledge_space_id: int,
     payload: DocumentSchema.DocumentCreate,
     session: Session = Depends(get_session),
     user: User = Depends(dependencies_auth.get_current_user),
@@ -65,7 +65,7 @@ async def upload_document(
     return await document_service.add_document(
         session=session,
         user=user,
-        collection_id=collection_id,
+        knowledge_space_id=knowledge_space_id,
         document=payload
     )
 

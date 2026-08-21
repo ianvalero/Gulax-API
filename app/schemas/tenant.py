@@ -27,7 +27,7 @@ class TenantRead(SQLModel):
     id: int
     name: str
     description: str | None
-    is_global: bool
+    is_global_retrieval: bool
     roles: list[str]
     created_at: datetime
     created_by: str
@@ -45,13 +45,13 @@ class TenantReadDetails(TenantRead):
 class TenantCreate(SQLModel):
     name: str = Field(min_length=1)
     description: str | None = Field(default=None)
-    is_global: bool = Field(default=False)
+    is_global_retrieval: bool = Field(default=False)
     roles: list[str] = Field(min_length=1)
 
 
 class TenantUpdate(SQLModel):
     description: str | None = Field(default=None, max_length=255)
-    is_global: bool | None = Field(default=None)
+    is_global_retrieval: bool | None = Field(default=None)
     roles: list[str] | None = Field(default=None, min_length=1)
 
 

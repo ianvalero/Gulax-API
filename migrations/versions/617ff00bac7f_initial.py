@@ -1,8 +1,8 @@
-"""initial migration
+"""initial
 
-Revision ID: 657fd146d6ab
+Revision ID: 617ff00bac7f
 Revises: 
-Create Date: 2026-08-20 12:34:53.978320
+Create Date: 2026-08-21 16:47:33.509435
 
 """
 from typing import Sequence, Union
@@ -13,7 +13,7 @@ import sqlmodel
 from sqlalchemy.dialects import postgresql
 
 # revision identifiers, used by Alembic.
-revision: str = '657fd146d6ab'
+revision: str = '617ff00bac7f'
 down_revision: Union[str, Sequence[str], None] = None
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
@@ -26,33 +26,29 @@ def upgrade() -> None:
     sa.Column('id', sa.Integer(), nullable=False),
     sa.Column('name', sqlmodel.sql.sqltypes.AutoString(), nullable=False),
     sa.Column('description', sqlmodel.sql.sqltypes.AutoString(length=255), nullable=True),
-    sa.Column('is_global', sa.Boolean(), nullable=False),
-    sa.Column('roles', postgresql.ARRAY(sa.String()), nullable=True),
-    sa.Column('created_at', sa.DateTime(), nullable=False),
+    sa.Column('is_global_retrieval', sa.Boolean(), nullable=False),
+    sa.Column('roles', postgresql.ARRAY(sa.String()), nullable=False),
+    sa.Column('created_at', sa.DateTime(timezone=True), nullable=False),
     sa.Column('created_by', sqlmodel.sql.sqltypes.AutoString(), nullable=False),
-    sa.Column('updated_at', sa.DateTime(), nullable=True),
+    sa.Column('updated_at', sa.DateTime(timezone=True), nullable=True),
     sa.Column('updated_by', sqlmodel.sql.sqltypes.AutoString(), nullable=True),
-    sa.Column('deleted_at', sa.DateTime(), nullable=True),
+    sa.Column('deleted_at', sa.DateTime(timezone=True), nullable=True),
     sa.Column('deleted_by', sqlmodel.sql.sqltypes.AutoString(), nullable=True),
     sa.PrimaryKeyConstraint('id')
     )
-    op.create_index(op.f('ix_tenants_created_at'), 'tenants', ['created_at'], unique=False)
-    op.create_index(op.f('ix_tenants_created_by'), 'tenants', ['created_by'], unique=False)
-    op.create_index(op.f('ix_tenants_description'), 'tenants', ['description'], unique=False)
-    op.create_index(op.f('ix_tenants_is_global'), 'tenants', ['is_global'], unique=False)
-    op.create_index(op.f('ix_tenants_name'), 'tenants', ['name'], unique=True)
+    op.create_index('uq_tenants_active_name', 'tenants', [sa.literal_column('lower(name)')], unique=True, postgresql_where=sa.text('deleted_at IS NULL'))
     op.create_table('users',
     sa.Column('id', sa.Integer(), nullable=False),
     sa.Column('sso_id', sqlmodel.sql.sqltypes.AutoString(), nullable=False),
     sa.Column('username', sqlmodel.sql.sqltypes.AutoString(), nullable=False),
     sa.Column('name', sqlmodel.sql.sqltypes.AutoString(), nullable=False),
     sa.Column('email', sqlmodel.sql.sqltypes.AutoString(), nullable=False),
-    sa.Column('roles', postgresql.ARRAY(sa.String()), nullable=True),
+    sa.Column('roles', postgresql.ARRAY(sa.String()), nullable=False),
     sa.Column('api_key', sqlmodel.sql.sqltypes.AutoString(), nullable=True),
     sa.Column('api_key_expires_at', sa.DateTime(timezone=True), nullable=True),
     sa.Column('is_active', sa.Boolean(), nullable=False),
-    sa.Column('last_login', sa.DateTime(), nullable=True),
-    sa.Column('created_at', sa.DateTime(), nullable=False),
+    sa.Column('last_login', sa.DateTime(timezone=True), nullable=True),
+    sa.Column('created_at', sa.DateTime(timezone=True), nullable=False),
     sa.PrimaryKeyConstraint('id'),
     sa.UniqueConstraint('username')
     )
@@ -63,37 +59,33 @@ def upgrade() -> None:
     sa.Column('tenant_id', sa.Integer(), nullable=False),
     sa.Column('name', sqlmodel.sql.sqltypes.AutoString(), nullable=False),
     sa.Column('description', sqlmodel.sql.sqltypes.AutoString(length=255), nullable=True),
-    sa.Column('created_at', sa.DateTime(), nullable=False),
+    sa.Column('created_at', sa.DateTime(timezone=True), nullable=False),
     sa.Column('created_by', sqlmodel.sql.sqltypes.AutoString(), nullable=False),
-    sa.Column('updated_at', sa.DateTime(), nullable=True),
+    sa.Column('updated_at', sa.DateTime(timezone=True), nullable=True),
     sa.Column('updated_by', sqlmodel.sql.sqltypes.AutoString(), nullable=True),
-    sa.Column('deleted_at', sa.DateTime(), nullable=True),
+    sa.Column('deleted_at', sa.DateTime(timezone=True), nullable=True),
     sa.Column('deleted_by', sqlmodel.sql.sqltypes.AutoString(), nullable=True),
     sa.ForeignKeyConstraint(['tenant_id'], ['tenants.id'], ),
     sa.PrimaryKeyConstraint('id')
     )
-    op.create_index(op.f('ix_knowledge_spaces_created_at'), 'knowledge_spaces', ['created_at'], unique=False)
     op.create_index(op.f('ix_knowledge_spaces_created_by'), 'knowledge_spaces', ['created_by'], unique=False)
-    op.create_index(op.f('ix_knowledge_spaces_description'), 'knowledge_spaces', ['description'], unique=False)
-    op.create_index(op.f('ix_knowledge_spaces_name'), 'knowledge_spaces', ['name'], unique=True)
+    op.create_index(op.f('ix_knowledge_spaces_tenant_id'), 'knowledge_spaces', ['tenant_id'], unique=False)
+    op.create_index('uq_knowledge_spaces_active_tenant_name', 'knowledge_spaces', ['tenant_id', sa.literal_column('lower(name)')], unique=True, postgresql_where=sa.text('deleted_at IS NULL'))
     op.create_table('documents',
     sa.Column('id', sa.Integer(), nullable=False),
     sa.Column('knowledge_space_id', sa.Integer(), nullable=False),
     sa.Column('description', sqlmodel.sql.sqltypes.AutoString(length=255), nullable=False),
-    sa.Column('created_at', sa.DateTime(), nullable=False),
+    sa.Column('created_at', sa.DateTime(timezone=True), nullable=False),
     sa.Column('created_by', sqlmodel.sql.sqltypes.AutoString(), nullable=False),
-    sa.Column('updated_at', sa.DateTime(), nullable=True),
+    sa.Column('updated_at', sa.DateTime(timezone=True), nullable=True),
     sa.Column('updated_by', sqlmodel.sql.sqltypes.AutoString(), nullable=True),
-    sa.Column('deleted_at', sa.DateTime(), nullable=True),
+    sa.Column('deleted_at', sa.DateTime(timezone=True), nullable=True),
     sa.Column('deleted_by', sqlmodel.sql.sqltypes.AutoString(), nullable=True),
     sa.ForeignKeyConstraint(['knowledge_space_id'], ['knowledge_spaces.id'], ),
     sa.PrimaryKeyConstraint('id')
     )
-    op.create_index(op.f('ix_documents_created_at'), 'documents', ['created_at'], unique=False)
-    op.create_index(op.f('ix_documents_created_by'), 'documents', ['created_by'], unique=False)
-    op.create_index(op.f('ix_documents_description'), 'documents', ['description'], unique=False)
     op.create_index(op.f('ix_documents_knowledge_space_id'), 'documents', ['knowledge_space_id'], unique=False)
-    op.create_table('documents_versions',
+    op.create_table('document_versions',
     sa.Column('id', sa.Integer(), nullable=False),
     sa.Column('document_id', sa.Integer(), nullable=False),
     sa.Column('version_number', sa.Integer(), nullable=False),
@@ -102,44 +94,50 @@ def upgrade() -> None:
     sa.Column('file_size', sa.Integer(), nullable=False),
     sa.Column('mime_type', sqlmodel.sql.sqltypes.AutoString(), nullable=False),
     sa.Column('uploaded_by', sqlmodel.sql.sqltypes.AutoString(), nullable=False),
-    sa.Column('uploaded_at', sa.DateTime(), nullable=False),
-    sa.Column('task_id', sqlmodel.sql.sqltypes.AutoString(), nullable=True),
-    sa.Column('attempts', sa.Integer(), nullable=False),
-    sa.Column('error_message', sqlmodel.sql.sqltypes.AutoString(), nullable=True),
-    sa.Column('status', sa.Enum('PENDING', 'PROCESSING', 'ACTIVE', 'FAILED', 'ARCHIVED', name='documentversionstatus', native_enum=False), nullable=True),
+    sa.Column('uploaded_at', sa.DateTime(timezone=True), nullable=False),
+    sa.Column('status', sa.Enum('PENDING', 'ACTIVE', 'FAILED', 'ARCHIVED', name='documentversionstatus', native_enum=False), nullable=False),
+    sa.Column('activated_at', sa.DateTime(timezone=True), nullable=True),
+    sa.Column('deleted_at', sa.DateTime(timezone=True), nullable=True),
+    sa.Column('deleted_by', sqlmodel.sql.sqltypes.AutoString(), nullable=True),
     sa.ForeignKeyConstraint(['document_id'], ['documents.id'], ),
+    sa.PrimaryKeyConstraint('id'),
+    sa.UniqueConstraint('document_id', 'version_number', name='uq_document_version')
+    )
+    op.create_index(op.f('ix_document_versions_document_id'), 'document_versions', ['document_id'], unique=False)
+    op.create_index('uq_document_versions_active_document', 'document_versions', ['document_id'], unique=True, postgresql_where=sa.text("status = 'active' AND deleted_at IS NULL"))
+    op.create_table('ingestion_runs',
+    sa.Column('id', sa.Integer(), nullable=False),
+    sa.Column('document_version_id', sa.Integer(), nullable=False),
+    sa.Column('status', sa.Enum('PENDING', 'PROCESSING', 'COMPLETED', 'FAILED', name='ingestionrunstatus', native_enum=False), nullable=False),
+    sa.Column('retry_count', sa.Integer(), nullable=False),
+    sa.Column('error_message', sqlmodel.sql.sqltypes.AutoString(), nullable=True),
+    sa.Column('created_at', sa.DateTime(timezone=True), nullable=False),
+    sa.Column('started_at', sa.DateTime(timezone=True), nullable=True),
+    sa.Column('finished_at', sa.DateTime(timezone=True), nullable=True),
+    sa.ForeignKeyConstraint(['document_version_id'], ['document_versions.id'], ),
     sa.PrimaryKeyConstraint('id')
     )
-    op.create_index(op.f('ix_documents_versions_document_id'), 'documents_versions', ['document_id'], unique=False)
-    op.create_index(op.f('ix_documents_versions_task_id'), 'documents_versions', ['task_id'], unique=False)
-    op.create_index(op.f('ix_documents_versions_version_number'), 'documents_versions', ['version_number'], unique=False)
+    op.create_index(op.f('ix_ingestion_runs_document_version_id'), 'ingestion_runs', ['document_version_id'], unique=False)
     # ### end Alembic commands ###
 
 
 def downgrade() -> None:
     """Downgrade schema."""
     # ### commands auto generated by Alembic - please adjust! ###
-    op.drop_index(op.f('ix_documents_versions_version_number'), table_name='documents_versions')
-    op.drop_index(op.f('ix_documents_versions_task_id'), table_name='documents_versions')
-    op.drop_index(op.f('ix_documents_versions_document_id'), table_name='documents_versions')
-    op.drop_table('documents_versions')
+    op.drop_index(op.f('ix_ingestion_runs_document_version_id'), table_name='ingestion_runs')
+    op.drop_table('ingestion_runs')
+    op.drop_index('uq_document_versions_active_document', table_name='document_versions', postgresql_where=sa.text("status = 'active' AND deleted_at IS NULL"))
+    op.drop_index(op.f('ix_document_versions_document_id'), table_name='document_versions')
+    op.drop_table('document_versions')
     op.drop_index(op.f('ix_documents_knowledge_space_id'), table_name='documents')
-    op.drop_index(op.f('ix_documents_description'), table_name='documents')
-    op.drop_index(op.f('ix_documents_created_by'), table_name='documents')
-    op.drop_index(op.f('ix_documents_created_at'), table_name='documents')
     op.drop_table('documents')
-    op.drop_index(op.f('ix_knowledge_spaces_name'), table_name='knowledge_spaces')
-    op.drop_index(op.f('ix_knowledge_spaces_description'), table_name='knowledge_spaces')
+    op.drop_index('uq_knowledge_spaces_active_tenant_name', table_name='knowledge_spaces', postgresql_where=sa.text('deleted_at IS NULL'))
+    op.drop_index(op.f('ix_knowledge_spaces_tenant_id'), table_name='knowledge_spaces')
     op.drop_index(op.f('ix_knowledge_spaces_created_by'), table_name='knowledge_spaces')
-    op.drop_index(op.f('ix_knowledge_spaces_created_at'), table_name='knowledge_spaces')
     op.drop_table('knowledge_spaces')
     op.drop_index(op.f('ix_users_sso_id'), table_name='users')
     op.drop_index(op.f('ix_users_api_key'), table_name='users')
     op.drop_table('users')
-    op.drop_index(op.f('ix_tenants_name'), table_name='tenants')
-    op.drop_index(op.f('ix_tenants_is_global'), table_name='tenants')
-    op.drop_index(op.f('ix_tenants_description'), table_name='tenants')
-    op.drop_index(op.f('ix_tenants_created_by'), table_name='tenants')
-    op.drop_index(op.f('ix_tenants_created_at'), table_name='tenants')
+    op.drop_index('uq_tenants_active_name', table_name='tenants', postgresql_where=sa.text('deleted_at IS NULL'))
     op.drop_table('tenants')
     # ### end Alembic commands ###

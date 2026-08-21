@@ -1,5 +1,5 @@
 from typing import cast
-from datetime import datetime
+from datetime import datetime, timezone
 
 from sqlmodel import Session, select, func
 from sqlalchemy import or_
@@ -82,13 +82,13 @@ class TenantRepository:
         return tenant
 
     def update_tenant(self, session: Session, tenant: TenantDB) -> TenantDB:
-        tenant.updated_at = datetime.now()
+        tenant.updated_at = datetime.now(timezone.utc)
         session.add(tenant)
         session.flush()
         return tenant
 
     def delete_tenant(self, session: Session, tenant: TenantDB) -> bool:
-        tenant.deleted_at = datetime.now()
+        tenant.deleted_at = datetime.now(timezone.utc)
         session.flush()
         return True
 

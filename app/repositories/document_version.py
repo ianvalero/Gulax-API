@@ -58,6 +58,14 @@ class DocumentVersionRepository:
 
         return session.exec(statement).first()
 
+    def get_next_version_number(self, session: Session, document_id: int) -> int:
+        statement = (
+            select(func.coalesce(func.max(DocumentVersionDB.version_number), 0))
+            .where(DocumentVersionDB.document_id == document_id)
+        )
+        current_max = cast(int, session.exec(statement).one())
+        return current_max + 1
+
     def add_document_version(self, session: Session, document_version: DocumentVersionDB) -> DocumentVersionDB:
         session.add(document_version)
         session.flush()
@@ -124,7 +132,7 @@ class DocumentVersionRepository:
 
         if filters:
             if filters.filename:
-                where_conditions.append(DocumentVersionDB.original_filename.ilike(f"%{filters.filename}%"))
+                where_conditions.append(DocumentVersionDB.filename.ilike(f"%{filters.filename}%"))
             if filters.status:
                 where_conditions.append(DocumentVersionDB.status == filters.status)
             if filters.upload_by:

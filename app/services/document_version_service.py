@@ -1,6 +1,5 @@
 from __future__ import annotations
 from typing import TYPE_CHECKING
-from pathlib import Path
 import os
 import uuid
 import aiofiles
@@ -81,10 +80,15 @@ class DocumentVersionService:
         await self.__check_document_permissions(session=session, user=user, document_id=document_id)
 
         document_version_path = await self.__save_document_version_file(file=file)
+        next_version_number = self.document_version_repository.get_next_version_number(
+            session=session,
+            document_id=document_id,
+        )
+
         document_version_db: DocumentVersionDB = DocumentVersionDB(
             document_id=document_id,
-            filename=Path(document_version_path).name,
-            original_filename=file.filename,
+            version_number=next_version_number,
+            filename=file.filename,
             file_path=document_version_path,
             file_size=file.size,
             mime_type=file.content_type,

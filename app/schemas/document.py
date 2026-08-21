@@ -9,7 +9,8 @@ from app.enums import DocumentSortField, SortDirection
 
 
 class DocumentQueryParams(PaginationParams):
-    collection_id: int | None = Field(default=None, gt=0)
+    knowledge_space_id: int | None = Field(default=None, gt=0)
+    knowledge_space_name: str | None = None
     description: str | None = None
     roles: list[str] = Field(default_factory=list)
     created_by: str | None = None
@@ -32,7 +33,7 @@ class DocumentRead(SQLModel):
     deleted_at: datetime | None = None
     deleted_by: str | None = None
 
-    documents_versions: list[DocumentVersionRead] = list()
+    document_versions: list[DocumentVersionRead] = list()
 
     model_config = ConfigDict(from_attributes=True)
 

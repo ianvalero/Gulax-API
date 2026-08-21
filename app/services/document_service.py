@@ -1,7 +1,7 @@
 import logging
 from sqlmodel import Session
 
-# from app.services import CollectionService
+from app.services import KnowledgeSpaceService
 from app.repositories.document import DocumentRepository
 from app.models.document import DocumentDB
 from app.infrastructure.qdrant_gateway import QdrantGateway
@@ -11,9 +11,10 @@ from app.exceptions import DocumentNotFoundError, QdrantOperationError
 
 
 class DocumentService:
-    def __init__(self, qdrant_gateway: QdrantGateway):
+    def __init__(self, qdrant_gateway: QdrantGateway, knowledge_space_service: KnowledgeSpaceService):
         self.logger = logging.getLogger(f"app.{__name__}")
         self.qdrant = qdrant_gateway
+        self.knowledge_space_service = knowledge_space_service
         self.document_repository = DocumentRepository()
         self.logger.info("Document Service initialized")
 
@@ -23,21 +24,21 @@ class DocumentService:
         user: User,
         params: DocumentSchema.DocumentQueryParams
     ) -> tuple[list[DocumentSchema.DocumentRead], int]:
-        if params.collection_id:
-            await self.collection_service.check_access(
+        if params.knowledge_space_id:
+            await self.knowledge_space_service.check_access(
                 session=session,
                 user=user,
-                collection_id=params.collection_id
+                knowledge_space_id=params.knowledge_space_id
             )
-            collection_ids = [params.collection_id]
+            knowledge_space_ids = [params.knowledge_space_id]
         else:
-            collection_ids = await self.collection_service.get_collection_ids(session=session, user=user)
-            if not collection_ids:
+            knowledge_space_ids = await self.knowledge_space_service.get_knowledge_space_ids(session=session, user=user)
+            if not knowledge_space_ids:
                 return [], 0
 
         documents_db, total = self.document_repository.get_documents(
             session=session,
-            collection_ids=collection_ids,
+            knowledge_space_ids=knowledge_space_ids,
             params=params,
         )
 
@@ -55,17 +56,17 @@ class DocumentService:
         self,
         session: Session,
         user: User,
-        collection_id: int,
+        knowledge_space_id: int,
         document: DocumentSchema.DocumentCreate
     ) -> DocumentSchema.DocumentRead:
-        await self.collection_service.check_access(
+        await self.knowledge_space_service.check_access(
             session=session,
             user=user,
-            collection_id=collection_id
+            knowledge_space_id=knowledge_space_id
         )
         document_db: DocumentDB = DocumentDB(
             **document.model_dump(),
-            collection_id=collection_id,
+            knowledge_space_id=knowledge_space_id,
             created_by=user.username
         )
         self.document_repository.add_document(session=session, document=document_db)
@@ -102,15 +103,16 @@ class DocumentService:
 
         self.document_repository.delete_document(session=session, document=document_db)
 
-        active_version = document_db.documents_versions[0] if document_db.documents_versions else None
+        active_version = document_db.document_versions[0] if document_db.document_versions else None
         try:
-            if active_version and active_version.qdrant_point_ids:
-                await self.qdrant.delete_points(
-                    collection_name=document_db.collection.qdrant_name,
-                    point_ids=active_version.qdrant_point_ids
-                )
-
-            session.commit()
+            #TODO Revisar esto para que el delete en qdrant se haga buscando por metadata
+            # if active_version and active_version.qdrant_point_ids:
+            #     await self.qdrant.delete_points(
+            #         collection_name=document_db.collection.qdrant_name,
+            #         point_ids=active_version.qdrant_point_ids
+            #     )
+            #
+            # session.commit()
             self.logger.info(f"Document {document_id} marked as deleted in database")
             return True
         except Exception as err:
@@ -127,10 +129,10 @@ class DocumentService:
         if not document_db:
             raise DocumentNotFoundError(f"Document {document_id} not found")
 
-        await self.collection_service.check_access(
+        await self.knowledge_space_service.check_access(
             session=session,
             user=user,
-            collection_id=document_db.collection_id
+            knowledge_space_id=document_db.knowledge_space_id
         )
 
         return document_db

@@ -1,5 +1,6 @@
 from typing import cast
-from datetime import datetime
+from datetime import datetime, timezone
+
 from sqlmodel import Session, select, func
 from sqlalchemy.orm import selectinload
 
@@ -38,7 +39,7 @@ class KnowledgeSpaceRepository:
 
         knowledge_spaces_statement = (
             select(KnowledgeSpaceDB)
-            .join(TenantDB, KnowledgeSpaceDB.tenant_id == TenantDB.id)
+            .join(KnowledgeSpaceDB.tenant)
             .where(*where_conditions)
             .options(selectinload(KnowledgeSpaceDB.tenant))
         )
@@ -54,7 +55,7 @@ class KnowledgeSpaceRepository:
         total_statement = (
             select(func.count())
             .select_from(KnowledgeSpaceDB)
-            .join(TenantDB, KnowledgeSpaceDB.tenant_id == TenantDB.id)
+            .join(KnowledgeSpaceDB.tenant)
             .where(*where_conditions)
         )
 
@@ -62,8 +63,13 @@ class KnowledgeSpaceRepository:
         total = cast(int, session.exec(total_statement).one())
         return documents, total
 
-    def get_knowledge_space_ids(self, session: Session, knowledge_space_id: int) -> list[int]:
-        pass
+    def get_knowledge_space_ids(self, session: Session, tenant_ids: list[int]) -> list[int]:
+        where_conditions = [
+            KnowledgeSpaceDB.tenant_id.in_(tenant_ids),
+            KnowledgeSpaceDB.deleted_at.is_(None),
+        ]
+        statement = select(KnowledgeSpaceDB.id).where(*where_conditions)
+        return list(session.exec(statement).all())
 
     def get_knowledge_space(self, session: Session, knowledge_space_id: int) -> KnowledgeSpaceDB | None:
         statement = (
@@ -82,13 +88,13 @@ class KnowledgeSpaceRepository:
         return knowledge_space
 
     def update_knowledge_space(self, session: Session, knowledge_space: KnowledgeSpaceDB) -> KnowledgeSpaceDB:
-        knowledge_space.updated_at = datetime.now()
+        knowledge_space.updated_at = datetime.now(timezone.utc)
         session.add(knowledge_space)
         session.flush()
         return knowledge_space
 
     def delete_knowledge_space(self, session: Session, knowledge_space: KnowledgeSpaceDB) -> bool:
-        knowledge_space.deleted_at = datetime.now()
+        knowledge_space.deleted_at = datetime.now(timezone.utc)
         session.flush()
         return True
 

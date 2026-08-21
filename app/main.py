@@ -29,7 +29,10 @@ async def lifespan(app: FastAPI):
     app.state.knowledge_space_service = services.KnowledgeSpaceService(
         tenant_service=app.state.tenant_service
     )
-    app.state.document_service = services.DocumentService(qdrant_gateway=app.state.qdrant_gateway)
+    app.state.document_service = services.DocumentService(
+        qdrant_gateway=app.state.qdrant_gateway,
+        knowledge_space_service=app.state.knowledge_space_service
+    )
     app.state.document_version_service = services.DocumentVersionService(
         celery_client=app.state.celery_client,
         document_service=app.state.document_service
