@@ -96,15 +96,7 @@ class TenantRepository:
         if is_admin:
             return []
 
-        if not roles:
-            return [TenantDB.is_global.is_(True)]
-
-        return [
-            or_(
-                TenantDB.is_global.is_(True),
-                TenantDB.roles.overlap(roles),
-            )
-        ]
+        return [TenantDB.roles.overlap(roles)]
 
     def __generate_filters(self, filters: TenantQueryParams | None = None) -> list:
         where_conditions = []

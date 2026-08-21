@@ -228,8 +228,8 @@ __marimo__/
 # Streamlit
 .streamlit/secrets.toml
 
-models/
-files/
+/models/
+/files/
 
 .env*
 !.env*.example

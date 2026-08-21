@@ -47,7 +47,7 @@ async def get_tenants(
 
 @router.get(
 "/{tenant_id}",
-    response_model=TenantSchema.TenantRead,
+    response_model=TenantSchema.TenantReadDetails,
     summary="Get tenant by id")
 async def get_tenant(
     tenant_id: int,

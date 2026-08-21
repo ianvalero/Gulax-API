@@ -77,6 +77,7 @@ async def create_knowledge_space(
 
 @router.patch(
 "/{knowledge_space_id}",
+    response_model=KnowledgeSpaceSchema.KnowledgeSpaceReadDetail,
     status_code=status.HTTP_200_OK,
     summary="Update Knowledge Space")
 async def update_knowledge_space(
