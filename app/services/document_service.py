@@ -25,7 +25,7 @@ class DocumentService:
         params: DocumentSchema.DocumentQueryParams
     ) -> tuple[list[DocumentSchema.DocumentRead], int]:
         if params.knowledge_space_id:
-            await self.knowledge_space_service.check_access(
+            await self.knowledge_space_service.require_management_access(
                 session=session,
                 user=user,
                 knowledge_space_id=params.knowledge_space_id
@@ -59,7 +59,7 @@ class DocumentService:
         knowledge_space_id: int,
         document: DocumentSchema.DocumentCreate
     ) -> DocumentSchema.DocumentRead:
-        await self.knowledge_space_service.check_access(
+        await self.knowledge_space_service.require_management_access(
             session=session,
             user=user,
             knowledge_space_id=knowledge_space_id
@@ -129,7 +129,7 @@ class DocumentService:
         if not document_db:
             raise DocumentNotFoundError(f"Document {document_id} not found")
 
-        await self.knowledge_space_service.check_access(
+        await self.knowledge_space_service.require_management_access(
             session=session,
             user=user,
             knowledge_space_id=document_db.knowledge_space_id

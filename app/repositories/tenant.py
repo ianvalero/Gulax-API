@@ -2,10 +2,10 @@ from typing import cast
 from datetime import datetime, timezone
 
 from sqlmodel import Session, select, func
-from sqlalchemy import or_
-from sqlalchemy.orm import selectinload
+from sqlalchemy.orm import selectinload, with_loader_criteria
 
 from app.models.tenant import TenantDB
+from app.models.knowledge_space import KnowledgeSpaceDB
 from app.schemas.tenant import TenantQueryParams
 from app.repositories.sorting import sort_data
 from app.enums import TenantSortField
@@ -36,7 +36,13 @@ class TenantRepository:
         tenants_statement = select(TenantDB).where(*where_conditions)
 
         if params.include_knowledge_spaces:
-            tenants_statement = tenants_statement.options(selectinload(TenantDB.knowledge_spaces))
+            tenants_statement = tenants_statement.options(
+                selectinload(TenantDB.knowledge_spaces),
+                with_loader_criteria(
+                    KnowledgeSpaceDB,
+                    KnowledgeSpaceDB.deleted_at.is_(None),
+                )
+            )
 
         tenants_statement = sort_data(
             statement=tenants_statement,
@@ -72,7 +78,13 @@ class TenantRepository:
                 TenantDB.id == tenant_id,
                 TenantDB.deleted_at.is_(None),
             )
-            .options(selectinload(TenantDB.knowledge_spaces))
+            .options(
+                selectinload(TenantDB.knowledge_spaces),
+                with_loader_criteria(
+                    KnowledgeSpaceDB,
+                    KnowledgeSpaceDB.deleted_at.is_(None),
+                )
+            )
         )
         return session.exec(statement).first()
 

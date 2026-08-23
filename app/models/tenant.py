@@ -22,7 +22,7 @@ class TenantDB(SQLModel, table=True):
     )
 
     id: int | None = Field(default=None, primary_key=True)
-    name: str
+    name: str = Field(min_length=1)
     description: str | None = Field(default=None, max_length=255)
     is_global_retrieval: bool = Field(default=False)
     roles: list[str] = Field(sa_column=Column(ARRAY(String), nullable=False))

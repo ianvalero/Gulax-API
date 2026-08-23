@@ -39,7 +39,7 @@ class CeleryClient:
             self.logger.exception(e)
             raise
 
-    def update_document_version(self, document_version_id: int):
+    def process_document_version(self, ingestion_run_id: int):
         """
         Updates the specified document version by initiating a Celery task to
         process the document. Logs the status of the task initiation and returns
@@ -54,16 +54,16 @@ class CeleryClient:
         :raises Exception: If there is an error while sending the task to
             Celery for processing.
         """
-        self.logger.info(f"Updating document version {document_version_id} in Celery task")
+        self.logger.info(f"Sending task for process new document version {ingestion_run_id} to Celery")
         try:
             task = celery_app.send_task(
                 "tasks.process_document_version",
-                kwargs={"document_version_id": document_version_id}
+                kwargs={"ingestion_run_id": ingestion_run_id}
             )
-            self.logger.info(f"Document version {document_version_id} update task sent to Celery successfully")
+            self.logger.info(f"Task sent for processing document version {ingestion_run_id}: {task.id}")
             return task.id
         except Exception as e:
-            self.logger.error(f"Error sending document version update task for {document_version_id} to Celery")
+            self.logger.error(f"Error sending task for processing document version {ingestion_run_id} to Celery")
             self.logger.exception(e)
             raise
 

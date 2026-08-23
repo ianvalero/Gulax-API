@@ -1,27 +1,30 @@
-from typing import Any
 from datetime import datetime
+
 from sqlmodel import SQLModel
-from pydantic import ConfigDict, BaseModel
+from pydantic import ConfigDict, Field
 
-from app.enums import DocumentVersionStatus
+from app.schemas.pagination import PaginationParams
+from app.schemas.ingestion_run import IngestionRunRead
+from app.enums import DocumentVersionStatus, DocumentVersionsSortField, SortDirection
 
 
-class DocumentVersionFilters(BaseModel):
+class DocumentVersionQueryParams(PaginationParams):
     filename: str | None = None
     status: DocumentVersionStatus | None = None
     upload_by: str | None = None
     upload_at_from: datetime | None = None
     upload_at_to: datetime | None = None
 
+    sort_by: DocumentVersionsSortField = DocumentVersionsSortField.ID
+    sort_order: SortDirection = SortDirection.ASC
+
 class DocumentVersionRead(SQLModel):
     id: int
     document_id: int
-    version_number: int
     filename: str
+    version_number: int
     uploaded_by: str
     uploaded_at: datetime
-    task_id: str | None = None
-    error_message: str | None
     status: DocumentVersionStatus
 
     model_config = ConfigDict(from_attributes=True)
@@ -30,11 +33,6 @@ class DocumentVersionReadDetail(DocumentVersionRead):
     file_path: str
     file_size: int
     mime_type: str
-    qdrant_point_ids: list[str] | None
-    attempts: int
+    activated_at: datetime | None = Field(default=None)
 
-
-class DocumentVersionTaskRead(SQLModel):
-    task_id: str
-    status: str
-    result: Any | None = None
+    ingestion_runs: list[IngestionRunRead] = Field(default_factory=list)

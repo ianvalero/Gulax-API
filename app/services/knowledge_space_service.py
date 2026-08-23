@@ -1,13 +1,15 @@
 import logging
 
 from app.services import TenantService
+from sqlalchemy.exc import IntegrityError
 from sqlmodel import Session
 
 from app.models.knowledge_space import KnowledgeSpaceDB
 from app.repositories.knowledge_space import KnowledgeSpaceRepository
 from app.schemas.user import User
 import app.schemas.knowledge_space as KnowledgeSpaceSchema
-from app.exceptions import KnowledgeSpaceNotFoundError
+from app.exceptions import KnowledgeSpaceNotFoundError, KnowledgeSpaceNameConflictError
+
 
 class KnowledgeSpaceService:
     def __init__(self, tenant_service: TenantService):
@@ -23,10 +25,10 @@ class KnowledgeSpaceService:
         params: KnowledgeSpaceSchema.KnowledgeSpaceQueryParams
     ) -> tuple[list[KnowledgeSpaceSchema.KnowledgeSpaceReadDetail], int]:
         if params.tenant_id:
-            await self.tenant_service.check_access(session=session, user=user, tenant_id=params.tenant_id)
+            await self.tenant_service.require_management_access(session=session, user=user, tenant_id=params.tenant_id)
             tenant_ids = [params.tenant_id]
         else:
-            tenant_ids = await self.tenant_service.get_tenant_ids(session=session, user=user)
+            tenant_ids = await self.tenant_service.get_manageable_tenant_ids(session=session, user=user)
             if not tenant_ids:
                 return [], 0
 
@@ -44,7 +46,7 @@ class KnowledgeSpaceService:
         return knowledge_spaces, total
 
     async def get_knowledge_space_ids(self, session: Session, user: User) -> list[int]:
-        tenant_ids = await self.tenant_service.get_tenant_ids(session=session, user=user)
+        tenant_ids = await self.tenant_service.get_manageable_tenant_ids(session=session, user=user)
         if not tenant_ids:
             return []
 
@@ -79,7 +81,7 @@ class KnowledgeSpaceService:
         tenant_id: int,
         knowledge_space: KnowledgeSpaceSchema.KnowledgeSpaceCreate
     ) -> KnowledgeSpaceSchema.KnowledgeSpaceReadDetail:
-        await self.tenant_service.check_access(session=session, user=user, tenant_id=tenant_id)
+        await self.tenant_service.require_management_access(session=session, user=user, tenant_id=tenant_id)
 
         knowledge_space_db: KnowledgeSpaceDB = KnowledgeSpaceDB(
             **knowledge_space.model_dump(),
@@ -88,7 +90,13 @@ class KnowledgeSpaceService:
         )
         self.knowledge_repository.create_knowledge_space(session=session, knowledge_space=knowledge_space_db)
 
-        session.commit()
+        try:
+            session.commit()
+        except IntegrityError as err:
+            session.rollback()
+            raise KnowledgeSpaceNameConflictError(
+                f"Knowledge Space with name {knowledge_space.name} already exists"
+            ) from err
 
         knowledge_space_db = self.knowledge_repository.get_knowledge_space(
             session=session,
@@ -97,9 +105,6 @@ class KnowledgeSpaceService:
 
         self.logger.info(f"Knowledge Space {knowledge_space_db.name} creado con éxito | SQL ID: {knowledge_space_db.id}")
         return KnowledgeSpaceSchema.KnowledgeSpaceReadDetail.model_validate(knowledge_space_db)
-
-    async def check_access(self, session: Session, user: User, knowledge_space_id: int) -> None:
-        await self.__get_db_knowledge_space(session=session, user=user, knowledge_space_id=knowledge_space_id)
 
     async def update_knowledge_space(
         self,
@@ -149,6 +154,9 @@ class KnowledgeSpaceService:
         self.logger.info(f"Knowledge Space {knowledge_space_db.name} eliminado | SQL ID: {knowledge_space_db.id}")
         return True
 
+    async def require_management_access(self, session: Session, user: User, knowledge_space_id: int) -> None:
+        await self.__get_db_knowledge_space(session=session, user=user, knowledge_space_id=knowledge_space_id)
+
     async def __get_db_knowledge_space(self, session: Session, user: User, knowledge_space_id: int) -> KnowledgeSpaceDB:
         knowledge_space_db = self.knowledge_repository.get_knowledge_space(
             session=session,
@@ -158,5 +166,9 @@ class KnowledgeSpaceService:
         if not knowledge_space_db:
             raise KnowledgeSpaceNotFoundError(f"Knowledge Space with ID {knowledge_space_id} not found.")
 
-        await self.tenant_service.check_access(session=session, user=user, tenant_id=knowledge_space_db.tenant_id)
+        await self.tenant_service.require_management_access(
+            session=session,
+            user=user,
+            tenant_id=knowledge_space_db.tenant_id
+        )
         return knowledge_space_db

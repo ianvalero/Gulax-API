@@ -1,5 +1,6 @@
-from fastapi import APIRouter, Depends, status, Query
 from typing import Annotated
+
+from fastapi import APIRouter, Depends, status, Query
 from sqlmodel import Session
 
 from app.database import get_session

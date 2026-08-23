@@ -14,6 +14,9 @@ class InvalidApiKeyError(AppException):
 class UserNotFoundError(AppException):
     status_code = 404
 
+class TenantNameConflictError(AppException):
+    status_code = 409
+
 class TenantPermissionError(AppException):
     status_code = 403
 
@@ -23,10 +26,16 @@ class TenantNotFoundError(AppException):
 class DocumentNotFoundError(AppException):
     status_code = 404
 
+class KnowledgeSpaceNameConflictError(AppException):
+    status_code = 409
+
 class KnowledgeSpaceNotFoundError(AppException):
     status_code = 404
 
 class DocumentVersionNotFoundError(AppException):
+    status_code = 404
+
+class IngestionRunNotFoundError(AppException):
     status_code = 404
 
 class CeleryTaskNotFoundError(AppException):

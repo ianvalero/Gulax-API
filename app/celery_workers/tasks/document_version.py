@@ -64,7 +64,7 @@ def run_async(coro):
     default_retry_delay=60,
     name="tasks.process_document_version",
 )
-def process_document_version(self, document_version_id: int):
+def process_document_version(self, ingestion_run_id: int):
     pass
     # with Session(engine) as session:
     #     document_version_db = document_version_repository.get_document_version(session, document_version_id)

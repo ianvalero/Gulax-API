@@ -23,7 +23,7 @@ class KnowledgeSpaceDB(SQLModel, table=True):
 
     id: int | None = Field(default=None, primary_key=True)
     tenant_id: int = Field(foreign_key="tenants.id", index=True)
-    name: str
+    name: str = Field(min_length=1)
     description: str | None = Field(default=None, max_length=255)
     created_at: datetime = Field(
         default_factory=lambda: datetime.now(timezone.utc),

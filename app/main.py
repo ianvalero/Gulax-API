@@ -33,9 +33,14 @@ async def lifespan(app: FastAPI):
         qdrant_gateway=app.state.qdrant_gateway,
         knowledge_space_service=app.state.knowledge_space_service
     )
-    app.state.document_version_service = services.DocumentVersionService(
+    app.state.ingestion_run_service = services.IngestionRunService(
         celery_client=app.state.celery_client,
         document_service=app.state.document_service
+    )
+    app.state.document_version_service = services.DocumentVersionService(
+        celery_client=app.state.celery_client,
+        document_service=app.state.document_service,
+        ingestion_run_service=app.state.ingestion_run_service
     )
     app.state.user_service = services.UserService()
 

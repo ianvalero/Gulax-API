@@ -5,19 +5,6 @@ class CollectionDistance(StrEnum):
     EUCLID = "Euclid"
     DOT = "Dot"
 
-class DocumentVersionStatus(StrEnum):
-    PENDING = "PENDING"
-    ACTIVE = "ACTIVE"
-    FAILED = "FAILED"
-    ARCHIVED = "ARCHIVED"
-
-
-class IngestionRunStatus(StrEnum):
-    PENDING = "PENDING"
-    PROCESSING = "PROCESSING"
-    COMPLETED = "COMPLETED"
-    FAILED = "FAILED"
-
 
 class SortDirection(StrEnum):
     ASC = "asc"
@@ -52,3 +39,30 @@ class DocumentSortField(StrEnum):
     TENANT_ROLES = "tenant_roles"
     CREATED_AT = "created_at"
     CREATED_BY = "created_by"
+
+
+class DocumentVersionsSortField(StrEnum):
+    ID = "id"
+    FILENAME = "filename"
+    STATUS = "status"
+    UPLOADED_AT = "uploaded_at"
+    UPLOADED_BY = "uploaded_by"
+
+
+class DocumentVersionStatus(StrEnum):
+    PENDING = "PENDING"
+    ACTIVE = "ACTIVE"
+    FAILED = "FAILED"
+    ARCHIVED = "ARCHIVED"
+
+
+class IngestionRunSortField(StrEnum):
+    ID = "id"
+    STATUS = "status"
+
+
+class IngestionRunStatus(StrEnum):
+    PENDING = "PENDING"
+    PROCESSING = "PROCESSING"
+    COMPLETED = "COMPLETED"
+    FAILED = "FAILED"

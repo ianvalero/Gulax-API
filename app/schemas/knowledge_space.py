@@ -4,7 +4,8 @@ from sqlmodel import SQLModel
 from pydantic import ConfigDict, Field
 
 from app.schemas.pagination import PaginationParams
-from app.enums import DocumentSortField, SortDirection
+from app.enums import KnowledgeSpaceSortField, SortDirection
+
 
 class KnowledgeSpaceQueryParams(PaginationParams):
     tenant_id: int | None = Field(default=None, gt=0)
@@ -16,7 +17,7 @@ class KnowledgeSpaceQueryParams(PaginationParams):
     created_at_to: datetime | None = None
     include_deleted: bool = False
 
-    sort_by: DocumentSortField = DocumentSortField.ID
+    sort_by: KnowledgeSpaceSortField = KnowledgeSpaceSortField.ID
     sort_order: SortDirection = SortDirection.ASC
 
 

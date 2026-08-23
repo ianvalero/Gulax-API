@@ -14,5 +14,8 @@ def get_document_service(request: Request) -> services.DocumentService:
 def get_document_version_service(request: Request) -> services.DocumentVersionService:
     return request.app.state.document_version_service
 
+def get_ingestion_run_service(request: Request) -> services.IngestionRunService:
+    return request.app.state.ingestion_run_service
+
 def get_user_service(request: Request) -> services.UserService:
     return request.app.state.user_service

@@ -23,9 +23,7 @@ class DocumentVersionDB(SQLModel, table=True):
             "uq_document_versions_active_document",
             "document_id",
             unique=True,
-            postgresql_where=text(
-                "status = 'active' AND deleted_at IS NULL"
-            ),
+            postgresql_where=text("status = 'ACTIVE'"),
         ),
     )
 
@@ -58,11 +56,6 @@ class DocumentVersionDB(SQLModel, table=True):
         default=None,
         sa_type=DateTime(timezone=True),
     )
-    deleted_at: datetime | None = Field(
-        default=None,
-        sa_type=DateTime(timezone=True),
-    )
-    deleted_by: str | None = Field(default=None)
 
     document: "DocumentDB" = Relationship(back_populates="document_versions")
     ingestion_runs: list["IngestionRunDB"] = Relationship(back_populates="document_version")

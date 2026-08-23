@@ -5,6 +5,7 @@ import uuid
 import aiofiles
 import logging
 
+from app.services.ingestion_run_service import IngestionRunService
 from sqlmodel import Session
 
 from app.config.settings import settings
@@ -21,10 +22,16 @@ if TYPE_CHECKING:
 
 
 class DocumentVersionService:
-    def __init__(self, celery_client: CeleryClient, document_service: DocumentService):
+    def __init__(
+        self,
+        celery_client: CeleryClient,
+        document_service: DocumentService,
+        ingestion_run_service: IngestionRunService
+    ):
         self.logger = logging.getLogger(f"app.{__name__}")
         self.celery = celery_client
         self.document_service = document_service
+        self.ingestion_run_service = ingestion_run_service
         self.document_version_repository = DocumentVersionRepository()
         self.logger.info("Document Version Service initialized")
 
@@ -33,21 +40,17 @@ class DocumentVersionService:
         session: Session,
         user: User,
         document_id: int,
-        filters: DocumentVersionSchema.DocumentVersionFilters | None = None,
-        offset: int = 0,
-        limit: int = 100
+        params: DocumentVersionSchema.DocumentVersionQueryParams,
     ) -> tuple[list[DocumentVersionSchema.DocumentVersionRead], int]:
         await self.__check_document_permissions(session=session, user=user, document_id=document_id)
         document_versions_db, total = self.document_version_repository.get_document_versions(
             session=session,
             document_id=document_id,
-            offset=offset,
-            limit=limit,
-            filters=filters
+            params=params
         )
 
         document_versions_read = [
-            DocumentVersionSchema.DocumentVersionRead(**document_version_db.model_dump())
+            DocumentVersionSchema.DocumentVersionRead.model_validate(document_version_db)
             for document_version_db in document_versions_db
         ]
         return document_versions_read, total
@@ -60,15 +63,16 @@ class DocumentVersionService:
         document_version_id: int
     ) -> DocumentVersionSchema.DocumentVersionReadDetail:
         await self.__check_document_permissions(session=session, user=user, document_id=document_id)
+
         document_version_db = self.document_version_repository.get_document_version(
             session=session,
             document_version_id=document_version_id
         )
 
-        if not document_version_db or document_version_db.document_id != document_id:
-            raise DocumentVersionNotFoundError(f"Version {document_version_id} not found in document {document_id}")
+        if not document_version_db or document_id != document_version_db.document_id:
+            raise DocumentVersionNotFoundError(f"Version {document_version_id} not found")
 
-        return DocumentVersionSchema.DocumentVersionReadDetail(**document_version_db.model_dump())
+        return DocumentVersionSchema.DocumentVersionReadDetail.model_validate(document_version_db)
 
     async def add_document_version(
         self,
@@ -100,30 +104,50 @@ class DocumentVersionService:
             document_version=document_version_db
         )
 
-        try:
-            task_id = self.celery.update_document_version(document_version_id=document_version_db.id)
-            document_version_db = self.document_version_repository.set_document_version_task_id(
-                session=session,
-                document_version=document_version_db,
-                task_id=task_id
-            )
+        ingestion_run_db = self.ingestion_run_service.create_ingestion_run(
+            session=session,
+            document_version_id=document_version_db.id
+        )
 
+        session.commit()
+        session.refresh(document_version_db)
+        session.refresh(ingestion_run_db)
+
+        try:
+            task_id = self.celery.process_document_version(ingestion_run_id=ingestion_run_db.id)
         except Exception as err:
             self.document_version_repository.update_version_as_failed(
                 session=session,
-                document_version=document_version_db,
-                error_message=f"Failed to enqueue Celery task to process a new document"
-                              f" version {document_version_db.id} for document {document_id}"
+                document_version=document_version_db
             )
+
+            self.ingestion_run_service.mark_as_failed(
+                session=session,
+                ingestion_run_id=ingestion_run_db.id,
+                error_message="Failed to enqueue Celery task",
+            )
+
             session.commit()
+
+            try:
+                os.remove(document_version_path)
+            except OSError:
+                self.logger.warning(f"Could not remove file {document_version_path}")
+
             raise CeleryTaskEnqueueError(
                 f"Failed to enqueue Celery task to process a new document version for document {document_id}"
             ) from err
 
+        self.ingestion_run_service.assign_celery_task(
+            session=session,
+            ingestion_run=ingestion_run_db,
+            celery_task_id=task_id,
+        )
+
         session.commit()
         session.refresh(document_version_db)
 
-        return DocumentVersionSchema.DocumentVersionReadDetail(**document_version_db.model_dump())
+        return DocumentVersionSchema.DocumentVersionReadDetail.model_validate(document_version_db)
 
     async def __save_document_version_file(self, file: UploadFile):
         original_name, extension = os.path.splitext(os.path.basename(file.filename))

@@ -24,7 +24,7 @@ async def get_tenants(
     user: User = Depends(dependencies_auth.get_current_user),
     tenant_service: TenantService = Depends(dependencies_services.get_tenant_service)
 ):
-    items, total = await tenant_service.get_tenants(session=session, user=user, params=params,)
+    items, total = await tenant_service.get_manageable_tenants(session=session, user=user, params=params, )
     pagination = Pagination(
         offset=params.offset,
         limit=params.limit,

@@ -42,10 +42,11 @@ class UserService:
         if not user_db or not user_db.is_active:
             raise InvalidApiKeyError("Invalid or inactive API key")
 
-        if user_db.api_key_expires_at < datetime.now(timezone.utc):
+        if user_db.api_key_expires_at is None or user_db.api_key_expires_at < datetime.now(timezone.utc):
             raise InvalidApiKeyError("API key expired")
 
-        self.user_repository.update_api_key_expiration_date(session, user_db)
+        self.user_repository.update_api_key_expiration_date(session=session, user=user_db)
+        session.commit()
         return User(
             username=user_db.username,
             email=user_db.email,

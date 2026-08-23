@@ -56,7 +56,7 @@ async def get_knowledge_space(
 
 
 @create_knowledge_space_router.post(
-"/{tenant_id}/knowledge-space",
+"/{tenant_id}/knowledge-spaces",
     response_model=KnowledgeSpaceSchema.KnowledgeSpaceReadDetail,
     status_code=status.HTTP_201_CREATED,
     summary="Create knowledge space")
