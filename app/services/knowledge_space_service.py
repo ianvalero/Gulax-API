@@ -1,19 +1,21 @@
 import logging
 
-from app.services import TenantService
 from sqlalchemy.exc import IntegrityError
 from sqlmodel import Session
 
 from app.models.knowledge_space import KnowledgeSpaceDB
+from app.infrastructure import QdrantGateway
 from app.repositories.knowledge_space import KnowledgeSpaceRepository
+from app.services import TenantService
 from app.schemas.user import User
 import app.schemas.knowledge_space as KnowledgeSpaceSchema
 from app.exceptions import KnowledgeSpaceNotFoundError, KnowledgeSpaceNameConflictError
 
 
 class KnowledgeSpaceService:
-    def __init__(self, tenant_service: TenantService):
+    def __init__(self, qdrant_gateway: QdrantGateway, tenant_service: TenantService):
         self.logger = logging.getLogger(f"app.{__name__}")
+        self._qdrant_gateway = qdrant_gateway
         self.tenant_service = tenant_service
         self.knowledge_repository = KnowledgeSpaceRepository()
         self.logger.info("Knowledge Space Service initialized")
@@ -150,6 +152,11 @@ class KnowledgeSpaceService:
         self.knowledge_repository.delete_knowledge_space(session=session, knowledge_space=knowledge_space_db)
 
         session.commit()
+
+        try:
+            await self._qdrant_gateway.delete_points(key="knowledge_space_id", value=knowledge_space_id)
+        except Exception:
+            self.logger.exception(f"Error deleting points from Qdrant for knowledge_space_id={knowledge_space_id}")
 
         self.logger.info(f"Knowledge Space {knowledge_space_db.name} eliminado | SQL ID: {knowledge_space_db.id}")
         return True

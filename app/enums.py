@@ -66,3 +66,7 @@ class IngestionRunStatus(StrEnum):
     PROCESSING = "PROCESSING"
     COMPLETED = "COMPLETED"
     FAILED = "FAILED"
+
+class ChunkIndexState(StrEnum):
+    STAGING = "staging"
+    ACTIVE = "active"

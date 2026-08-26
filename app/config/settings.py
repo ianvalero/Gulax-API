@@ -1,3 +1,4 @@
+from typing import ClassVar
 from pathlib import Path
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -48,6 +49,8 @@ class CelerySettings(BaseSettings):
     result_expires: int = 86400
     task_track_started: bool = True
     worker_max_tasks_per_child: int = 200
+    max_ingestion_attempts: int = 3
+    countdown_retry_delay: int = 30
 
     model_config = SettingsConfigDict(
         env_prefix="CELERY_",
@@ -60,6 +63,7 @@ class CelerySettings(BaseSettings):
 
 class QdrantSettings(BaseSettings):
     url: str
+    collection_name: str
     size: int                                                   # Número de dimensiones de cada vector - ¡Tiene que ser lo que indique el modelo de embbeding!
     distance: CollectionDistance = CollectionDistance.COSINE    # Define como se calcula la similitud entre vectores
     shard_number: int = 1                                       # Divide la colección en particiones
@@ -98,12 +102,22 @@ class Settings(BaseSettings):
     automation_api_token: str
     proxy_url: str | None = None
     files_storage_path: str = "/files"
+    max_version_retries: int = 5
+    max_file_size_mb: int = 100
+    allowed_file_types: ClassVar[set[str]] = {
+        ".pdf", ".docx", ".pptx", ".rtf", ".html", ".htm",
+        ".csv", ".xlsx", ".xls", ".txt", ".md"
+    }
 
     postgres: PostgresSettings = Field(default_factory=PostgresSettings)
     redis: RedisSettings = Field(default_factory=RedisSettings)
     celery: CelerySettings = Field(default_factory=CelerySettings)
     qdrant: QdrantSettings = Field(default_factory=QdrantSettings)
     embedding: EmbeddingSettings = Field(default_factory=EmbeddingSettings)
+
+    @property
+    def max_file_size(self) -> int:
+        return self.max_file_size_mb * 1024 * 1024
 
     @model_validator(mode="after")
     def assemble_celery_urls(self):

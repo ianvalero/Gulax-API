@@ -5,19 +5,21 @@ from datetime import datetime, timezone
 from sqlmodel import Session
 
 from app.repositories.user import UserRepository
+from app.services import TenantService
 from app.schemas.user import UserSSO, UserLoginResponse, User
 from app.models.user import UserDB
 from app.exceptions import InvalidApiKeyError, UserNotFoundError
 
 
 class UserService:
-    def __init__(self):
+    def __init__(self, tenant_service: TenantService):
         self.logger = logging.getLogger(f"app.{__name__}")
+        self.tenant_service = tenant_service
         self.user_repository = UserRepository()
         self.logger.info("User Service initialized")
 
     def authenticate_sso_user(self, session: Session, user: UserSSO) -> UserLoginResponse:
-        user_db = self.user_repository.update_or_create_user(session, user)
+        user_db = self.user_repository.update_or_create_user(session=session, user=user)
 
         if not user_db.api_key:
             self.__generate_api_key(session=session, db_user=user_db)
@@ -25,6 +27,8 @@ class UserService:
             if user_db.api_key_expires_at < datetime.now(timezone.utc):
                 raise InvalidApiKeyError("API key expired")
             self.user_repository.update_api_key_expiration_date(session=session, user=user_db)
+
+        self.tenant_service.ensure_tenants_for_roles(session=session, roles=user.roles)
 
         session.commit()
         session.refresh(user_db)

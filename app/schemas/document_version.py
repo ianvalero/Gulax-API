@@ -34,5 +34,6 @@ class DocumentVersionReadDetail(DocumentVersionRead):
     file_size: int
     mime_type: str
     activated_at: datetime | None = Field(default=None)
+    archived_at: datetime | None = Field(default=None)
 
     ingestion_runs: list[IngestionRunRead] = Field(default_factory=list)

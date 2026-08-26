@@ -4,15 +4,19 @@ from sqlalchemy.exc import IntegrityError
 from sqlmodel import Session
 
 from app.models.tenant import TenantDB
+from app.infrastructure import QdrantGateway
 from app.repositories.tenant import TenantRepository
 from app.schemas.user import User
 import app.schemas.tenant as TenantSchema
 from app.exceptions import TenantNotFoundError, TenantPermissionError, TenantNameConflictError
 
 
+EXCLUDED_ROLES = {"ROLE_ADMIN", "ROLE_AUTOMATION"}
+
 class TenantService:
-    def __init__(self):
+    def __init__(self, qdrant_gateway: QdrantGateway):
         self.logger = logging.getLogger(f"app.{__name__}")
+        self._qdrant_gateway = qdrant_gateway
         self.tenant_repository = TenantRepository()
         self.logger.info("Tenant Service initialized")
 
@@ -119,6 +123,11 @@ class TenantService:
 
         session.commit()
 
+        try:
+            await self._qdrant_gateway.delete_points(key="tenant_id", value=tenant_id)
+        except Exception:
+            self.logger.exception(f"Error deleting points from Qdrant for tenant_id={tenant_id}")
+
         self.logger.info(f"Tenant {tenant_db.name} eliminado | SQL ID: {tenant_db.id} ")
         return True
 
@@ -133,6 +142,42 @@ class TenantService:
 
         if not self.can_retrieve_tenant(user, tenant_db):
             raise TenantPermissionError("User does not have retrieval access to this tenant")
+
+    def ensure_tenants_for_roles(self, session: Session, roles: list[str]) -> bool:
+        roles_to_check: dict[str, str] = {
+            role: role.removeprefix("ROLE_").capitalize()
+            for role in roles if role not in EXCLUDED_ROLES
+        }
+
+        if not roles_to_check:
+            return True
+
+        existing_tenants = self.tenant_repository.get_existing_names(
+            session=session,
+            names=list(roles_to_check.values())
+        )
+
+        for role, tenant_name in roles_to_check.items():
+            if tenant_name.lower() in existing_tenants:
+                continue
+
+            tenant_db = TenantDB(
+                name=tenant_name,
+                description=f"Tenant for {role}",
+                roles=[role],
+                created_by="Automation"
+            )
+
+            try:
+                with session.begin_nested():
+                    self.tenant_repository.create_tenant(session=session, tenant=tenant_db)
+                    self.logger.info(f"Tenant {tenant_name} created for role {role} | SQL ID: {tenant_db.id}")
+            except IntegrityError:
+                session.rollback()
+                self.logger.warning(f"Tenant {tenant_name} already exists for role {role}")
+
+        return True
+
 
     @staticmethod
     def can_manage_tenant(user: User, tenant: TenantDB) -> bool:

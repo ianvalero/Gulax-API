@@ -1,4 +1,5 @@
 import logging
+
 from celery.result import AsyncResult
 
 from app.celery_workers.celery_app import celery_app
@@ -39,7 +40,7 @@ class CeleryClient:
             self.logger.exception(e)
             raise
 
-    def process_document_version(self, ingestion_run_id: int):
+    def process_document_version(self, ingestion_run_id: int, countdown: int | None = None):
         """
         Updates the specified document version by initiating a Celery task to
         process the document. Logs the status of the task initiation and returns
@@ -58,7 +59,8 @@ class CeleryClient:
         try:
             task = celery_app.send_task(
                 "tasks.process_document_version",
-                kwargs={"ingestion_run_id": ingestion_run_id}
+                kwargs={"ingestion_run_id": ingestion_run_id},
+                countdown=countdown,
             )
             self.logger.info(f"Task sent for processing document version {ingestion_run_id}: {task.id}")
             return task.id

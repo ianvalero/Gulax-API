@@ -35,6 +35,12 @@ class KnowledgeSpaceNotFoundError(AppException):
 class DocumentVersionNotFoundError(AppException):
     status_code = 404
 
+class DocumentVersionConflictError(AppException):
+    status_code = 409
+
+class FileValidationError(AppException):
+    status_code = 400
+
 class IngestionRunNotFoundError(AppException):
     status_code = 404
 

@@ -88,6 +88,16 @@ class TenantRepository:
         )
         return session.exec(statement).first()
 
+    def get_existing_names(self, session: Session, names: list[str]) -> set[str]:
+        statement = (
+            select(func.lower(TenantDB.name))
+            .where(
+                TenantDB.deleted_at.is_(None),
+                func.lower(TenantDB.name).in_([name.lower() for name in names])
+            )
+        )
+        return set(session.exec(statement).all())
+
     def create_tenant(self, session: Session, tenant: TenantDB) -> TenantDB:
         session.add(tenant)
         session.flush()

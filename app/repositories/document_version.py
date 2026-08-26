@@ -1,3 +1,4 @@
+from datetime import datetime, timezone
 from typing import cast
 
 from sqlmodel import Session, select, func
@@ -92,6 +93,7 @@ class DocumentVersionRepository:
 
     def update_version_as_active(self, session: Session, document_version: DocumentVersionDB) -> DocumentVersionDB:
         document_version.status = DocumentVersionStatus.ACTIVE
+        document_version.activated_at = datetime.now(timezone.utc)
 
         session.flush()
         return document_version
@@ -104,6 +106,7 @@ class DocumentVersionRepository:
 
     def update_version_as_archived(self, session: Session, document_version: DocumentVersionDB) -> DocumentVersionDB:
         document_version.status = DocumentVersionStatus.ARCHIVED
+        document_version.archived_at = datetime.now(timezone.utc)
 
         session.flush()
         return document_version

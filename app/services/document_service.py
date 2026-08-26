@@ -11,10 +11,10 @@ from app.exceptions import DocumentNotFoundError, QdrantOperationError
 
 
 class DocumentService:
-    def __init__(self, qdrant_gateway: QdrantGateway, knowledge_space_service: KnowledgeSpaceService):
+    def __init__(self, knowledge_space_service: KnowledgeSpaceService, qdrant_gateway: QdrantGateway):
         self.logger = logging.getLogger(f"app.{__name__}")
-        self.qdrant = qdrant_gateway
         self.knowledge_space_service = knowledge_space_service
+        self._qdrant_gateway = qdrant_gateway
         self.document_repository = DocumentRepository()
         self.logger.info("Document Service initialized")
 
@@ -99,26 +99,19 @@ class DocumentService:
 
     async def delete_document(self, session: Session, user: User, document_id: int) -> bool:
         document_db = await self.__fetch_document(session=session, user=user, document_id=document_id)
-        document_db.deleted_by = user.username
 
+        document_db.deleted_by = user.username
         self.document_repository.delete_document(session=session, document=document_db)
 
-        active_version = document_db.document_versions[0] if document_db.document_versions else None
+        session.commit()
+
         try:
-            #TODO Revisar esto para que el delete en qdrant se haga buscando por metadata
-            # if active_version and active_version.qdrant_point_ids:
-            #     await self.qdrant.delete_points(
-            #         collection_name=document_db.collection.qdrant_name,
-            #         point_ids=active_version.qdrant_point_ids
-            #     )
-            #
-            # session.commit()
-            self.logger.info(f"Document {document_id} marked as deleted in database")
-            return True
-        except Exception as err:
-            session.rollback()
-            self.logger.exception(f"Error deleting document {document_id} from Qdrant")
-            raise QdrantOperationError(f"Error deleting document {document_id} from Qdrant") from err
+            await self._qdrant_gateway.delete_points(key="document_id", value=document_id)
+        except Exception:
+            self.logger.exception(f"Error deleting points from Qdrant for document_id={document_id}")
+
+        self.logger.info(f"Document {document_db.id} eliminado | SQL ID: {document_db.id}")
+        return True
 
     async def __fetch_document(self, session: Session, user: User, document_id: int) -> DocumentDB:
         document_db = self.document_repository.get_document(
