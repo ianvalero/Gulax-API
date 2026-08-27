@@ -25,7 +25,7 @@ class TenantService:
         session: Session,
         user: User,
         params: TenantSchema.TenantQueryParams
-    ) -> tuple[list[TenantSchema.TenantRead | TenantSchema.TenantReadDetails], int]:
+    ) -> tuple[list[TenantSchema.TenantReadDetailsWithKnowledgeSpaces | TenantSchema.TenantReadDetails], int]:
         tenants_db, total = self.tenant_repository.get_tenants(
             session=session,
             roles=user.roles,
@@ -35,12 +35,12 @@ class TenantService:
 
         if params.include_knowledge_spaces:
             tenants = [
-                TenantSchema.TenantReadDetails.model_validate(tenant_db)
+                TenantSchema.TenantReadDetailsWithKnowledgeSpaces.model_validate(tenant_db)
                 for tenant_db in tenants_db
             ]
         else:
             tenants = [
-                TenantSchema.TenantRead.model_validate(tenant_db)
+                TenantSchema.TenantReadDetails.model_validate(tenant_db)
                 for tenant_db in tenants_db
             ]
 
@@ -53,13 +53,13 @@ class TenantService:
             is_admin=user.is_admin
         )
 
-    async def get_tenant(self, session: Session, user: User, tenant_id: int) -> TenantSchema.TenantReadDetails:
+    async def get_tenant(self, session: Session, user: User, tenant_id: int) -> TenantSchema.TenantReadDetailsWithKnowledgeSpaces:
         tenant_db = self.__get_db_tenant(session=session, tenant_id=tenant_id)
 
         if not self.can_manage_tenant(user, tenant_db):
             raise TenantPermissionError("User does not have management access to this tenant")
 
-        return TenantSchema.TenantReadDetails.model_validate(tenant_db)
+        return TenantSchema.TenantReadDetailsWithKnowledgeSpaces.model_validate(tenant_db)
 
     async def create_tenant(
         self,
@@ -95,7 +95,7 @@ class TenantService:
         user: User,
         tenant_id: int,
         data: TenantSchema.TenantUpdate
-    ) -> TenantSchema.TenantRead:
+    ) -> TenantSchema.TenantReadDetails:
         if not user.is_admin:
             raise TenantPermissionError(f"User {user.username} is not authorized to perform this action")
 
@@ -110,7 +110,7 @@ class TenantService:
         session.refresh(tenant_db)
 
         self.logger.info(f"Tenant {tenant_db.name} modificado con éxito | SQL ID: {tenant_db.id}")
-        return TenantSchema.TenantRead.model_validate(tenant_db)
+        return TenantSchema.TenantReadDetails.model_validate(tenant_db)
 
     async def delete_tenant(self, session: Session, user: User, tenant_id: int) -> bool:
         if not user.is_admin:
@@ -124,7 +124,7 @@ class TenantService:
         session.commit()
 
         try:
-            await self._qdrant_gateway.delete_points(key="tenant_id", value=tenant_id)
+            await self._qdrant_gateway.delete_tenant(tenant_id=tenant_id)
         except Exception:
             self.logger.exception(f"Error deleting points from Qdrant for tenant_id={tenant_id}")
 

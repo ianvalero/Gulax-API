@@ -154,7 +154,7 @@ class KnowledgeSpaceService:
         session.commit()
 
         try:
-            await self._qdrant_gateway.delete_points(key="knowledge_space_id", value=knowledge_space_id)
+            await self._qdrant_gateway.delete_knowledge_space(knowledge_space_id=knowledge_space_id)
         except Exception:
             self.logger.exception(f"Error deleting points from Qdrant for knowledge_space_id={knowledge_space_id}")
 

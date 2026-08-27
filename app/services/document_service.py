@@ -106,7 +106,7 @@ class DocumentService:
         session.commit()
 
         try:
-            await self._qdrant_gateway.delete_points(key="document_id", value=document_id)
+            await self._qdrant_gateway.delete_document(document_id=document_id)
         except Exception:
             self.logger.exception(f"Error deleting points from Qdrant for document_id={document_id}")
 

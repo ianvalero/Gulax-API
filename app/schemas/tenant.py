@@ -29,6 +29,10 @@ class TenantRead(SQLModel):
     description: str | None
     is_global_retrieval: bool
     roles: list[str]
+
+    model_config = ConfigDict(from_attributes=True)
+
+class TenantReadDetails(TenantRead):
     created_at: datetime
     created_by: str
     updated_at: datetime | None = None
@@ -36,9 +40,8 @@ class TenantRead(SQLModel):
     deleted_at: datetime | None = None
     deleted_by: str | None = None
 
-    model_config = ConfigDict(from_attributes=True)
 
-class TenantReadDetails(TenantRead):
+class TenantReadDetailsWithKnowledgeSpaces(TenantReadDetails):
     knowledge_spaces: list[KnowledgeSpaceRead] = Field(default_factory=list)
 
 

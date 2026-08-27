@@ -16,7 +16,7 @@ router = APIRouter(prefix="/api/tenants", tags=["Tenants"])
 
 @router.get(
     "",
-    response_model=PaginatedResponse[TenantSchema.TenantReadDetails] | PaginatedResponse[TenantSchema.TenantRead],
+    response_model=PaginatedResponse[TenantSchema.TenantReadDetailsWithKnowledgeSpaces] | PaginatedResponse[TenantSchema.TenantReadDetails],
     summary="Get all tenants")
 async def get_tenants(
     params: Annotated[TenantSchema.TenantQueryParams, Query()],
@@ -34,12 +34,12 @@ async def get_tenants(
     )
 
     if params.include_knowledge_spaces:
-        return PaginatedResponse[TenantSchema.TenantReadDetails](
-            items=cast(list[TenantSchema.TenantReadDetails], items),
+        return PaginatedResponse[TenantSchema.TenantReadDetailsWithKnowledgeSpaces](
+            items=cast(list[TenantSchema.TenantReadDetailsWithKnowledgeSpaces], items),
             pagination=pagination,
         )
 
-    return PaginatedResponse[TenantSchema.TenantRead](
+    return PaginatedResponse[TenantSchema.TenantReadDetails](
         items=items,
         pagination=pagination,
     )
@@ -47,7 +47,7 @@ async def get_tenants(
 
 @router.get(
 "/{tenant_id}",
-    response_model=TenantSchema.TenantReadDetails,
+    response_model=TenantSchema.TenantReadDetailsWithKnowledgeSpaces,
     summary="Get tenant by id")
 async def get_tenant(
     tenant_id: int,
@@ -75,7 +75,7 @@ async def create_tenant(
 
 @router.patch(
     "/{tenant_id}",
-    response_model=TenantSchema.TenantRead,
+    response_model=TenantSchema.TenantReadDetails,
     status_code=status.HTTP_200_OK,
     dependencies=[Depends(dependencies_auth.require_admin)],
     summary="Update tenant")

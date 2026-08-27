@@ -34,7 +34,7 @@ class KnowledgeSpaceSortField(StrEnum):
 class DocumentSortField(StrEnum):
     ID = "id"
     KNOWLEDGE_SPACE__ID = "knowledge_space_id"
-    KNOWLEDGE_SPACE_NAME = "knowledge_spac_name"
+    KNOWLEDGE_SPACE_NAME = "knowledge_space_name"
     DESCRIPTION = "description"
     TENANT_ROLES = "tenant_roles"
     CREATED_AT = "created_at"

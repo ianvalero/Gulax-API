@@ -206,7 +206,7 @@ class DocumentVersionService:
 
     async def delete_document_version_chunks(self, document_version_id: int) -> bool:
         try:
-            await self._qdrant_gateway.delete_points(key="document_version_id", value=document_version_id)
+            await self._qdrant_gateway.delete_document_version(document_version_id=document_version_id)
         except Exception:
             self.logger.exception(f"Error deleting points from Qdrant for document_version_id={document_version_id}")
 

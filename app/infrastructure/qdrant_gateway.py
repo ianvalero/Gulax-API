@@ -8,7 +8,7 @@ from qdrant_client.http.models import (
 )
 
 from app.config.settings import settings
-from app.schemas.collection import CollectionCreateQdrant
+from app.schemas.collection import CollectionCreateQdrant, HNSWConfig
 from app.enums import ChunkIndexState
 
 
@@ -27,15 +27,29 @@ class QdrantGateway:
         self._qdrant_aclient = AsyncQdrantClient(url=settings.qdrant.url)
         self.logger.info("Qdrant Client initialized")
 
-    async def ensure_collection(self, collection: CollectionCreateQdrant):
-        if await self._collection_exists(collection.name):
+    async def ensure_knowledge_store(self) -> bool:
+        collection_name = settings.qdrant.collection_name
+        if await self._collection_exists(collection_name=collection_name):
             return True
 
         try:
-            await self._create_collection(collection)
-            await self._create_indexes(collection.name)
+            collection = CollectionCreateQdrant(
+                name=collection_name,
+                size=settings.qdrant.size,
+                distance=settings.qdrant.distance,
+                shard_number=settings.qdrant.shard_number,
+                replication_factor=settings.qdrant.replication_factor,
+                on_disk_payload=settings.qdrant.on_disk_payload,
+                hnsw_config=HNSWConfig(
+                    m=settings.qdrant.node_conexions_number,
+                    ef_construct=settings.qdrant.ef_construct,
+                ),
+            )
+
+            await self._create_collection(collection=collection)
+            await self._create_payload_indexes(collection_name=collection_name)
         except Exception:
-            if await self._collection_exists(collection.name):
+            if await self._collection_exists(collection_name=collection_name):
                 return True
             raise
 
@@ -45,8 +59,11 @@ class QdrantGateway:
         points = [
             PointStruct(
                 id=self._build_point_id(
-                    node.metadata["document_version_id"],
-                    node.metadata["chunk_index"],
+                    tenant_id=node.metadata["tenant_id"],
+                    knowledge_space_id=node.metadata["knowledge_space_id"],
+                    document_id=node.metadata["document_id"],
+                    document_version_id=node.metadata["document_version_id"],
+                    chunk_index=node.metadata["chunk_index"],
                 ),
                 vector=node.embedding,
                 payload={**node.metadata, "text": node.get_content()},
@@ -87,21 +104,17 @@ class QdrantGateway:
             self.logger.exception(err)
             raise
 
-    async def delete_points(self, key: str, value: int) -> bool:
-        self.logger.info(f"Deleting points where {key}={value} from {settings.qdrant.collection_name}")
-        try:
-            await self._qdrant_aclient.delete(
-                collection_name=settings.qdrant.collection_name,
-                points_selector=FilterSelector(
-                    filter=Filter(must=[FieldCondition(key=key, match=MatchValue(value=value))])
-                ),
-                wait=True
-            )
-            return True
-        except Exception as err:
-            self.logger.error(f"Error deleting points where {key}={value} from {settings.qdrant.collection_name}")
-            self.logger.exception(err)
-            raise
+    async def delete_tenant(self, tenant_id: int) -> bool:
+        return await self._delete_points(key="tenant_id", value=tenant_id)
+
+    async def delete_knowledge_space(self, knowledge_space_id: int) -> bool:
+        return await self._delete_points(key="knowledge_space_id", value=knowledge_space_id)
+
+    async def delete_document(self, document_id: int) -> bool:
+        return await self._delete_points(key="document_id", value=document_id)
+
+    async def delete_document_version(self, document_version_id: int) -> bool:
+        return await self._delete_points(key="document_version_id", value=document_version_id)
 
     async def close(self):
         try:
@@ -140,16 +153,43 @@ class QdrantGateway:
             hnsw_config=hnsw_config
         )
 
+        self.logger.info(f"Collection {collection.name} created")
         return True
 
-    async def _create_indexes(self, collection_name: str) -> None:
-        self.logger.info(f"Creating indexes in {collection_name}")
+    async def _create_payload_indexes(self, collection_name: str) -> None:
         for field in QDRANT_INDEXES_PAYLOAD_FIELDS:
             await self._qdrant_aclient.create_payload_index(
                 collection_name=collection_name,
                 field_name=field,
                 field_schema=PayloadSchemaType.INTEGER,
             )
+        self.logger.info(f"Indexes created for {QDRANT_INDEXES_PAYLOAD_FIELDS} in {collection_name}")
 
-    def _build_point_id(self, document_version_id: int, chunk_index: int) -> str:
-        return str(uuid.uuid5(QDRANT_NAMESPACE, f"{document_version_id}:{chunk_index}"))
+    def _build_point_id(
+        self,
+        tenant_id: int,
+        knowledge_space_id: int,
+        document_id: int,
+        document_version_id: int,
+        chunk_index: int
+    ) -> str:
+        return str(uuid.uuid5(
+            namespace=QDRANT_NAMESPACE,
+            name=f"{tenant_id}:{knowledge_space_id}:{document_id}:{document_version_id}:{chunk_index}")
+        )
+
+    async def _delete_points(self, key: str, value: int) -> bool:
+        self.logger.info(f"Deleting points where {key}={value} from {settings.qdrant.collection_name}")
+        try:
+            await self._qdrant_aclient.delete(
+                collection_name=settings.qdrant.collection_name,
+                points_selector=FilterSelector(
+                    filter=Filter(must=[FieldCondition(key=key, match=MatchValue(value=value))])
+                ),
+                wait=True
+            )
+            return True
+        except Exception as err:
+            self.logger.error(f"Error deleting points where {key}={value} from {settings.qdrant.collection_name}")
+            self.logger.exception(err)
+            raise

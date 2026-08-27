@@ -7,9 +7,7 @@ from contextlib import asynccontextmanager
 from openinference.instrumentation.llama_index import LlamaIndexInstrumentor
 
 from app.config.log import setup_logging
-from app.config.settings import settings
 from app.routers import tenant, document, document_version, user, knowledge_space
-from app.schemas.collection import CollectionCreateQdrant, HNSWConfig
 import app.services as services
 import app.infrastructure as infrastructure
 
@@ -28,20 +26,7 @@ async def lifespan(app: FastAPI):
     app.state.celery_client = infrastructure.CeleryClient()
     app.state.storage_gateway = infrastructure.StorageGateway()
 
-    await app.state.qdrant_gateway.ensure_collection(
-        CollectionCreateQdrant(
-            name=settings.qdrant.collection_name,
-            size=settings.qdrant.size,
-            distance=settings.qdrant.distance,
-            shard_number=settings.qdrant.shard_number,
-            replication_factor=settings.qdrant.replication_factor,
-            on_disk_payload=settings.qdrant.on_disk_payload,
-            hnsw_config=HNSWConfig(
-                m=settings.qdrant.node_conexions_number,
-                ef_construct=settings.qdrant.ef_construct,
-            ),
-        )
-    )
+    await app.state.qdrant_gateway.ensure_knowledge_store()
 
     app.state.tenant_service = services.TenantService(qdrant_gateway=app.state.qdrant_gateway)
     app.state.knowledge_space_service = services.KnowledgeSpaceService(
