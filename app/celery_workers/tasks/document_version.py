@@ -131,10 +131,13 @@ def process_document_version(self, ingestion_run_id: int):
             )
 
         try:
-            _activate_and_archive_versions(session=session, document_version_db=document_version_db)
+            document_versions_archived = run_async(
+                _activate_and_archive_versions(session=session, document_version_db=document_version_db)
+            )
             ingestion_run_service.mark_ingestion_run_as_completed(session=session, ingestion_run_id=ingestion_run_id)
-
             session.commit()
+
+            run_async(_cleanup_archived_chunks(document_versions_archived=document_versions_archived))
             _update_task_state(
                 task_instance=self,
                 state=IngestionRunStatus.COMPLETED,
@@ -190,7 +193,7 @@ async def _embed_and_upload(document_version_db: DocumentVersionDB) -> int:
             "document_version_id": document_version_db.id,
             "filename": document_version_db.filename,
             "chunk_index": chunk_index,
-            "index_state": ChunkIndexState.STAGING,
+            "index_state": ChunkIndexState.STAGING.value,
         }
 
         if page is not None:
@@ -203,14 +206,24 @@ async def _embed_and_upload(document_version_db: DocumentVersionDB) -> int:
 
     return len(nodes)
 
-async def _activate_and_archive_versions(session: Session, document_version_db: DocumentVersionDB):
+async def _activate_and_archive_versions(
+    session: Session,
+    document_version_db: DocumentVersionDB
+) -> list[DocumentVersionDB]:
     await qdrant_gateway.activate_chunks(document_version_id=document_version_db.id)
 
-    document_version_service.activate_version_and_archive_previous(
+    document_version_db, document_versions_archived = document_version_service.activate_version_and_archive_previous(
         session=session,
         document_version_id=document_version_db.id
     )
     logger.info(f"Document version {document_version_db.id} activated and previous versions archived")
+
+    return document_versions_archived
+
+async def _cleanup_archived_chunks(document_versions_archived: list[DocumentVersionDB]):
+    for document_version_archived in document_versions_archived:
+        await document_version_service.delete_document_version_chunks(document_version_id=document_version_archived.id)
+
 
 def _update_task_state(
     task_instance,

@@ -75,7 +75,7 @@ class QdrantGateway:
         try:
             await self._qdrant_aclient.set_payload(
                 collection_name=settings.qdrant.collection_name,
-                payload={"index_state": ChunkIndexState.ACTIVE},
+                payload={"index_state": ChunkIndexState.ACTIVE.value},
                 points=Filter(
                     must=[FieldCondition(key="document_version_id", match=MatchValue(value=document_version_id))]
                 ),

@@ -6,7 +6,8 @@ from sqlmodel import Session
 from sqlalchemy.exc import IntegrityError
 
 from app.config.settings import settings
-from app.services import DocumentService, IngestionRunService
+from app.services.document_service import DocumentService
+from app.services.ingestion_run_service import IngestionRunService
 from app.repositories.document_version import DocumentVersionRepository
 from app.infrastructure import StorageGateway, CeleryClient, QdrantGateway
 from app.models.document_version import DocumentVersionDB
@@ -95,7 +96,7 @@ class DocumentVersionService:
                 document_id=document_id,
                 version_number=next_version_number,
                 filename=file.filename,
-                file_path=document_version_path,
+                file_path=str(document_version_path),
                 file_size=file.size,
                 mime_type=file.content_type,
                 uploaded_by=user.username,
@@ -157,7 +158,7 @@ class DocumentVersionService:
         self,
         session: Session,
         document_version_id: int,
-    ) -> DocumentVersionDB:
+    ) -> tuple[DocumentVersionDB, list[DocumentVersionDB]]:
         document_version_db = self.document_version_repository.get_document_version(
             session=session,
             document_version_id=document_version_id
@@ -166,13 +167,12 @@ class DocumentVersionService:
         if not document_version_db:
             raise DocumentVersionNotFoundError(f"Version {document_version_id} not found")
 
-        self.document_version_repository.update_version_as_active(session=session, document_version=document_version_db)
-
         previous_versions = self.document_version_repository.get_document_active_versions(
             session=session,
             document_id=document_version_db.document_id,
         )
 
+        archived_versions = []
         for previous_version in previous_versions:
             if previous_version.id == document_version_id:
                 continue
@@ -181,8 +181,11 @@ class DocumentVersionService:
                 session=session,
                 document_version=previous_version,
             )
+            archived_versions.append(previous_version)
 
-        return document_version_db
+        self.document_version_repository.update_version_as_active(session=session, document_version=document_version_db)
+
+        return document_version_db, archived_versions
 
     def mark_document_version_as_failed(
         self,

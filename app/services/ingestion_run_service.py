@@ -2,7 +2,7 @@ import logging
 
 from sqlmodel import Session
 
-from app.services import DocumentService
+from app.services.document_service import DocumentService
 from app.repositories.ingestion_run import IngestionRunRepository
 from app.infrastructure.celery_client import CeleryClient
 from app.models.ingestion_run import IngestionRunDB

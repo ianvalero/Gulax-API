@@ -59,10 +59,10 @@ class IngestionRunRepository:
             select(IngestionRunDB)
             .where(IngestionRunDB.id == ingestion_run_id)
             .options(
-                selectinload(IngestionRunDB.document_version),
-                selectinload(DocumentVersionDB.document),
-                selectinload(DocumentDB.knowledge_space),
-                selectinload(KnowledgeSpaceDB.tenant),
+                selectinload(IngestionRunDB.document_version)
+                .selectinload(DocumentVersionDB.document)
+                .selectinload(DocumentDB.knowledge_space)
+                .selectinload(KnowledgeSpaceDB.tenant)
             )
         )
         return session.exec(statement).first()

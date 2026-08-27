@@ -5,6 +5,7 @@ from .document_version import DocumentVersionDB
 from .ingestion_run import IngestionRunDB
 from .user import UserDB
 
+
 __all__ = [
     "TenantDB",
     "KnowledgeSpaceDB",

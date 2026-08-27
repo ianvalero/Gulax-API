@@ -1,6 +1,8 @@
 from sqlmodel import create_engine, Session
 
 from app.config.settings import settings
+import app.models
+
 
 engine = create_engine(settings.postgres.postgres_url, echo=settings.sql_log, pool_pre_ping=True)
 
