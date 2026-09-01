@@ -66,6 +66,7 @@ class QdrantSettings(BaseSettings):
     collection_name: str
     size: int                                                   # Número de dimensiones de cada vector - ¡Tiene que ser lo que indique el modelo de embbeding!
     distance: CollectionDistance = CollectionDistance.COSINE    # Define como se calcula la similitud entre vectores
+    score_threshold: float | None = None
     shard_number: int = 1                                       # Divide la colección en particiones
     replication_factor: int = 1                                 # Duplica datos para alta disponibilidad
     on_disk_payload: bool = True                                # Guardar metadata en disco en lugar de RAM
@@ -84,6 +85,8 @@ class QdrantSettings(BaseSettings):
 class EmbeddingSettings(BaseSettings):
     model_name: str
     base_url: str
+    api_key: str = "EMPTY"
+    embed_batch_size: int = 32
     chunk_size: int
     chunk_overlap: int
 

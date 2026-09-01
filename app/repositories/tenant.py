@@ -1,7 +1,7 @@
 from typing import cast
 from datetime import datetime, timezone
 
-from sqlmodel import Session, select, func
+from sqlmodel import Session, select, func, or_
 from sqlalchemy.orm import selectinload, with_loader_criteria
 
 from app.models.tenant import TenantDB
@@ -62,13 +62,22 @@ class TenantRepository:
         total = cast(int, session.exec(total_statement).one())
         return tenants, total
 
-    def get_tenant_ids(self, session: Session, roles: list[str], is_admin: bool = False) -> list[int]:
+    def get_manageable_tenant_ids(self, session: Session, roles: list[str], is_admin: bool = False) -> list[int]:
         where_conditions = [
             TenantDB.deleted_at.is_(None),
             *self.__base_conditions(roles=roles, is_admin=is_admin)
         ]
 
         statement = select(TenantDB.id).where(*where_conditions)
+        return list(session.exec(statement).all())
+
+    def get_retrieval_tenant_ids(self, session: Session, roles: list[str]) -> list[int]:
+        where_conditions = [
+            TenantDB.deleted_at.is_(None),
+            or_(TenantDB.roles.overlap(roles), TenantDB.is_global_retrieval.is_(True))
+        ]
+
+        statement = select(TenantDB.id).distinct().where(*where_conditions)
         return list(session.exec(statement).all())
 
     def get_tenant(self, session: Session, tenant_id: int) -> TenantDB | None:

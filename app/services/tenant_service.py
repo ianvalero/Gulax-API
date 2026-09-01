@@ -47,10 +47,16 @@ class TenantService:
         return tenants, total
 
     async def get_manageable_tenant_ids(self, session: Session, user: User) -> list[int]:
-        return self.tenant_repository.get_tenant_ids(
+        return self.tenant_repository.get_manageable_tenant_ids(
             session=session,
             roles=user.roles,
             is_admin=user.is_admin
+        )
+
+    async def get_retrievable_tenant_ids(self, session: Session, user: User) -> list[int]:
+        return self.tenant_repository.get_retrieval_tenant_ids(
+            session=session,
+            roles=user.roles,
         )
 
     async def get_tenant(self, session: Session, user: User, tenant_id: int) -> TenantSchema.TenantReadDetailsWithKnowledgeSpaces:
@@ -177,7 +183,6 @@ class TenantService:
                 self.logger.warning(f"Tenant {tenant_name} already exists for role {role}")
 
         return True
-
 
     @staticmethod
     def can_manage_tenant(user: User, tenant: TenantDB) -> bool:

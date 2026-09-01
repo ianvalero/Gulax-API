@@ -19,3 +19,6 @@ def get_ingestion_run_service(request: Request) -> services.IngestionRunService:
 
 def get_user_service(request: Request) -> services.UserService:
     return request.app.state.user_service
+
+def get_retrieval_service(request: Request) -> services.RetrievalService:
+    return request.app.state.retrieval_service

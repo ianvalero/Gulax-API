@@ -64,6 +64,9 @@ class KnowledgeSpaceRepository:
         return documents, total
 
     def get_knowledge_space_ids(self, session: Session, tenant_ids: list[int]) -> list[int]:
+        if not tenant_ids:
+            return []
+
         where_conditions = [
             KnowledgeSpaceDB.tenant_id.in_(tenant_ids),
             KnowledgeSpaceDB.deleted_at.is_(None),

@@ -1,4 +1,5 @@
 import logging
+
 from sqlmodel import Session
 
 from app.services import KnowledgeSpaceService
@@ -7,7 +8,7 @@ from app.models.document import DocumentDB
 from app.infrastructure.qdrant_gateway import QdrantGateway
 import app.schemas.document as DocumentSchema
 from app.schemas.user import User
-from app.exceptions import DocumentNotFoundError, QdrantOperationError
+from app.exceptions import DocumentNotFoundError
 
 
 class DocumentService:
@@ -32,7 +33,7 @@ class DocumentService:
             )
             knowledge_space_ids = [params.knowledge_space_id]
         else:
-            knowledge_space_ids = await self.knowledge_space_service.get_knowledge_space_ids(session=session, user=user)
+            knowledge_space_ids = await self.knowledge_space_service.get_manageable_knowledge_space_ids(session=session, user=user)
             if not knowledge_space_ids:
                 return [], 0
 

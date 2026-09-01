@@ -3,22 +3,23 @@ import uuid
 
 from qdrant_client import AsyncQdrantClient, QdrantClient
 from qdrant_client.http.models import (
-    VectorParams, Distance, HnswConfigDiff, PointStruct,
+    VectorParams, Distance, HnswConfigDiff, PointStruct, MatchAny,
     PayloadSchemaType, Filter, FieldCondition, MatchValue, FilterSelector
 )
 
 from app.config.settings import settings
-from app.schemas.collection import CollectionCreateQdrant, HNSWConfig
+from app.schemas.collection import CollectionCreateQdrant, HNSWConfig, ChunkUpsert
 from app.enums import ChunkIndexState
 
 
 QDRANT_NAMESPACE = uuid.uuid5(uuid.NAMESPACE_DNS, "gulax.qdrant")
-QDRANT_INDEXES_PAYLOAD_FIELDS = (
-    "tenant_id",
-    "knowledge_space_id",
-    "document_id",
-    "document_version_id"
-)
+QDRANT_INDEXES_PAYLOAD_FIELDS = {
+    "tenant_id": PayloadSchemaType.INTEGER,
+    "knowledge_space_id": PayloadSchemaType.INTEGER,
+    "document_id": PayloadSchemaType.INTEGER,
+    "document_version_id": PayloadSchemaType.INTEGER,
+    "index_state": PayloadSchemaType.KEYWORD
+}
 
 class QdrantGateway:
     def __init__(self):
@@ -29,46 +30,48 @@ class QdrantGateway:
 
     async def ensure_knowledge_store(self) -> bool:
         collection_name = settings.qdrant.collection_name
-        if await self._collection_exists(collection_name=collection_name):
-            return True
 
-        try:
-            collection = CollectionCreateQdrant(
-                name=collection_name,
-                size=settings.qdrant.size,
-                distance=settings.qdrant.distance,
-                shard_number=settings.qdrant.shard_number,
-                replication_factor=settings.qdrant.replication_factor,
-                on_disk_payload=settings.qdrant.on_disk_payload,
-                hnsw_config=HNSWConfig(
-                    m=settings.qdrant.node_conexions_number,
-                    ef_construct=settings.qdrant.ef_construct,
-                ),
-            )
+        if not await self._collection_exists(collection_name=collection_name):
+            try:
+                collection = CollectionCreateQdrant(
+                    name=collection_name,
+                    size=settings.qdrant.size,
+                    distance=settings.qdrant.distance,
+                    shard_number=settings.qdrant.shard_number,
+                    replication_factor=settings.qdrant.replication_factor,
+                    on_disk_payload=settings.qdrant.on_disk_payload,
+                    hnsw_config=HNSWConfig(
+                        m=settings.qdrant.node_conexions_number,
+                        ef_construct=settings.qdrant.ef_construct,
+                    ),
+                )
 
-            await self._create_collection(collection=collection)
-            await self._create_payload_indexes(collection_name=collection_name)
-        except Exception:
-            if await self._collection_exists(collection_name=collection_name):
-                return True
-            raise
+                await self._create_collection(collection=collection)
+            except Exception:
+                if not await self._collection_exists(collection_name=collection_name):
+                    raise
 
+        await self._create_payload_indexes(collection_name=collection_name)
         return True
 
-    async def upsert_chunks(self, nodes: list) -> int:
+    async def upsert_chunks(self, chunks: list[ChunkUpsert]) -> int:
         points = [
             PointStruct(
                 id=self._build_point_id(
-                    tenant_id=node.metadata["tenant_id"],
-                    knowledge_space_id=node.metadata["knowledge_space_id"],
-                    document_id=node.metadata["document_id"],
-                    document_version_id=node.metadata["document_version_id"],
-                    chunk_index=node.metadata["chunk_index"],
+                    tenant_id=chunk.tenant_id,
+                    knowledge_space_id=chunk.knowledge_space_id,
+                    document_id=chunk.document_id,
+                    document_version_id=chunk.document_version_id,
+                    chunk_index=chunk.chunk_index,
                 ),
-                vector=node.embedding,
-                payload={**node.metadata, "text": node.get_content()},
+                vector=chunk.embedding,
+                payload=chunk.model_dump(
+                    mode="json",
+                    exclude={"embedding"},
+                    exclude_none=True
+                ),
             )
-            for node in nodes
+            for chunk in chunks
         ]
 
         try:
@@ -104,6 +107,32 @@ class QdrantGateway:
             self.logger.exception(err)
             raise
 
+    async def search_chunks(
+        self,
+        query_embedding: list[float],
+        tenant_ids: list[int],
+        knowledge_space_ids: list[int] | None = None,
+        limit: int = 10
+    ) -> list[dict]:
+        must = [
+            FieldCondition(key="tenant_id", match=MatchAny(any=tenant_ids)),
+            FieldCondition(key="index_state", match=MatchValue(value=ChunkIndexState.ACTIVE.value)),
+        ]
+
+        if knowledge_space_ids:
+            must.append(FieldCondition(key="knowledge_space_id", match=MatchAny(any=knowledge_space_ids)))
+
+        results = await self._qdrant_aclient.query_points(
+            collection_name=settings.qdrant.collection_name,
+            query=query_embedding,
+            query_filter=Filter(must=must),
+            with_payload=True,
+            limit=limit,
+            score_threshold=settings.qdrant.score_threshold,
+        )
+
+        return [{"score": point.score, "payload": point.payload} for point in results.points]
+
     async def delete_tenant(self, tenant_id: int) -> bool:
         return await self._delete_points(key="tenant_id", value=tenant_id)
 
@@ -128,7 +157,7 @@ class QdrantGateway:
     async def _collection_exists(self, collection_name: str) -> bool:
         return await self._qdrant_aclient.collection_exists(collection_name)
 
-    async def _create_collection(self, collection: CollectionCreateQdrant) -> dict:
+    async def _create_collection(self, collection: CollectionCreateQdrant) -> bool:
         if await self._collection_exists(collection.name):
             raise ValueError(f"Collection {collection.name} already exists")
 
@@ -157,11 +186,12 @@ class QdrantGateway:
         return True
 
     async def _create_payload_indexes(self, collection_name: str) -> None:
-        for field in QDRANT_INDEXES_PAYLOAD_FIELDS:
+        for field, value_type in QDRANT_INDEXES_PAYLOAD_FIELDS.items():
             await self._qdrant_aclient.create_payload_index(
                 collection_name=collection_name,
                 field_name=field,
-                field_schema=PayloadSchemaType.INTEGER,
+                field_schema=value_type,
+                wait=True
             )
         self.logger.info(f"Indexes created for {QDRANT_INDEXES_PAYLOAD_FIELDS} in {collection_name}")
 

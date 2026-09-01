@@ -32,6 +32,9 @@ class KnowledgeSpaceNameConflictError(AppException):
 class KnowledgeSpaceNotFoundError(AppException):
     status_code = 404
 
+class KnowledgeSpacePermissionError(AppException):
+    status_code = 403
+
 class DocumentVersionNotFoundError(AppException):
     status_code = 404
 
@@ -51,4 +54,7 @@ class CeleryTaskEnqueueError(AppException):
     status_code = 503
 
 class QdrantOperationError(AppException):
+    status_code = 503
+
+class EmbeddingServiceError(AppException):
     status_code = 503

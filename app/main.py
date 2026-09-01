@@ -7,7 +7,7 @@ from contextlib import asynccontextmanager
 from openinference.instrumentation.llama_index import LlamaIndexInstrumentor
 
 from app.config.log import setup_logging
-from app.routers import tenant, document, document_version, user, knowledge_space
+from app.routers import tenant, document, document_version, user, knowledge_space, retrieval
 import app.services as services
 import app.infrastructure as infrastructure
 
@@ -25,6 +25,7 @@ async def lifespan(app: FastAPI):
     app.state.redis_client = infrastructure.RedisClient()
     app.state.celery_client = infrastructure.CeleryClient()
     app.state.storage_gateway = infrastructure.StorageGateway()
+    app.state.embedding_model = infrastructure.build_embedding_model()
 
     await app.state.qdrant_gateway.ensure_knowledge_store()
 
@@ -47,6 +48,12 @@ async def lifespan(app: FastAPI):
         storage_gateway=app.state.storage_gateway,
         document_service=app.state.document_service,
         ingestion_run_service=app.state.ingestion_run_service
+    )
+    app.state.retrieval_service = services.RetrievalService(
+        tenant_service=app.state.tenant_service,
+        knowledge_space_service=app.state.knowledge_space_service,
+        qdrant_gateway=app.state.qdrant_gateway,
+        embedding_model=app.state.embedding_model
     )
     app.state.user_service = services.UserService(tenant_service=app.state.tenant_service)
 
@@ -91,6 +98,7 @@ async def global_exception_handler(request: Request, exc: Exception):
 
 app.include_router(user.router)
 app.include_router(tenant.router)
+app.include_router(retrieval.router)
 app.include_router(knowledge_space.router)
 app.include_router(knowledge_space.create_knowledge_space_router)
 app.include_router(document.create_document_router)

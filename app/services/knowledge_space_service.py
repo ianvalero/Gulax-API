@@ -47,8 +47,20 @@ class KnowledgeSpaceService:
 
         return knowledge_spaces, total
 
-    async def get_knowledge_space_ids(self, session: Session, user: User) -> list[int]:
+    async def get_manageable_knowledge_space_ids(self, session: Session, user: User) -> list[int]:
         tenant_ids = await self.tenant_service.get_manageable_tenant_ids(session=session, user=user)
+        if not tenant_ids:
+            return []
+
+        knowledge_space_ids = self.knowledge_repository.get_knowledge_space_ids(
+            session=session,
+            tenant_ids=tenant_ids
+        )
+
+        return knowledge_space_ids
+
+    async def get_retrievable_knowledge_space_ids(self, session: Session, user: User) -> list[int]:
+        tenant_ids = await self.tenant_service.get_retrievable_tenant_ids(session=session, user=user)
         if not tenant_ids:
             return []
 

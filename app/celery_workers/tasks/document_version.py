@@ -9,12 +9,13 @@ from llama_index.embeddings.openai import OpenAIEmbedding
 from sqlmodel import Session
 
 from app.config.settings import settings
-from app.infrastructure import CeleryClient, QdrantGateway, StorageGateway
+from app.schemas.collection import ChunkUpsert
+from app.infrastructure import CeleryClient, QdrantGateway, StorageGateway, build_embedding_model
 from app.models import IngestionRunDB, DocumentVersionDB
 from app.services import TenantService, KnowledgeSpaceService, DocumentService, DocumentVersionService, IngestionRunService
 from app.celery_workers.celery_app import celery_app
 from app.database import engine
-from app.enums import IngestionRunStatus, ChunkIndexState
+from app.enums import IngestionRunStatus
 
 
 logger = logging.getLogger(f"app.{__name__}")
@@ -43,12 +44,7 @@ def init_worker_connections(**kwargs):
     qdrant_gateway = QdrantGateway()
     celery_client = CeleryClient()
     storage_gateway = StorageGateway()
-    embedding_model = OpenAIEmbedding(
-        model_name=settings.embedding.model_name,
-        api_base=settings.embedding.base_url,
-        api_key="EMPTY",
-        embed_batch_size=32,
-    )
+    embedding_model = build_embedding_model()
 
     tenant_service = TenantService(qdrant_gateway=qdrant_gateway)
     knowledge_space_service = KnowledgeSpaceService(tenant_service=tenant_service, qdrant_gateway=qdrant_gateway)
@@ -117,7 +113,8 @@ def process_document_version(self, ingestion_run_id: int):
             raise
 
         try:
-            run_async(_embed_and_upload(document_version_db=document_version_db))
+            chunks_count = run_async(_embed_and_upload(document_version_db=document_version_db))
+            logger.info(f"Indexed {chunks_count} chunks for document version {document_version_db.id}")
         except Exception as err:
             session.rollback()
             logger.exception(f"Error embedding document version: {document_version_db.id}")
@@ -143,6 +140,7 @@ def process_document_version(self, ingestion_run_id: int):
                 state=IngestionRunStatus.COMPLETED,
                 ingestion_run_id=ingestion_run_id,
                 document_version_id=document_version_db.id,
+                chunks_indexed=chunks_count,
             )
         except Exception as err:
             session.rollback()
@@ -161,7 +159,8 @@ def process_document_version(self, ingestion_run_id: int):
         return {
             "status": IngestionRunStatus.COMPLETED,
             "ingestion_run_id": ingestion_run_id,
-            "document_version_id": document_version_db.id
+            "document_version_id": document_version_db.id,
+            "chunks_indexed":chunks_count,
         }
 
 async def _embed_and_upload(document_version_db: DocumentVersionDB) -> int:
@@ -183,28 +182,24 @@ async def _embed_and_upload(document_version_db: DocumentVersionDB) -> int:
 
     embeddings = await embedding_model.aget_text_embedding_batch(texts)
 
+    chunks = []
     for chunk_index, (node, embedding) in enumerate(zip(nodes, embeddings, strict=True)):
-        parser_metadata = node.metadata
-        page = parser_metadata.get("page_label")
-        node.metadata = {
-            "tenant_id": document_version_db.document.knowledge_space.tenant.id,
-            "knowledge_space_id": document_version_db.document.knowledge_space.id,
-            "document_id": document_version_db.document.id,
-            "document_version_id": document_version_db.id,
-            "filename": document_version_db.filename,
-            "chunk_index": chunk_index,
-            "index_state": ChunkIndexState.STAGING.value,
-        }
-
-        if page is not None:
-            node.metadata["page"] = page
-
-        node.embedding = embedding
+        chunks.append(ChunkUpsert(
+            tenant_id=document_version_db.document.knowledge_space.tenant.id,
+            knowledge_space_id=document_version_db.document.knowledge_space.id,
+            document_id=document_version_db.document.id,
+            document_version_id=document_version_db.id,
+            chunk_index=chunk_index,
+            text=node.get_content(),
+            embedding=embedding,
+            filename=document_version_db.filename,
+            page=node.metadata.get("page_label"),
+        ))
 
     await document_version_service.delete_document_version_chunks(document_version_id=document_version_db.id)
-    await qdrant_gateway.upsert_chunks(nodes=nodes)
+    await qdrant_gateway.upsert_chunks(chunks=chunks)
 
-    return len(nodes)
+    return len(chunks)
 
 async def _activate_and_archive_versions(
     session: Session,
