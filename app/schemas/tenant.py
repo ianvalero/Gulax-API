@@ -8,9 +8,15 @@ from app.schemas.knowledge_space import KnowledgeSpaceRead, KnowledgeSpaceReadDe
 from app.enums import TenantSortField, SortDirection
 
 
-class TenantQueryParams(PaginationParams):
+class TenantRetrievableQueryParams(PaginationParams):
     name: str | None = None
     description: str | None = None
+
+    sort_by: TenantSortField = TenantSortField.ID
+    sort_order: SortDirection = SortDirection.ASC
+
+
+class TenantQueryParams(TenantRetrievableQueryParams):
     roles: list[str] = Field(default_factory=list)
     created_by: str | None = None
     created_at_from: datetime | None = None
@@ -18,9 +24,6 @@ class TenantQueryParams(PaginationParams):
 
     include_knowledge_spaces: bool = False
     include_deleted: bool = False
-
-    sort_by: TenantSortField = TenantSortField.ID
-    sort_order: SortDirection = SortDirection.ASC
 
 
 class TenantRead(SQLModel):
@@ -31,6 +34,15 @@ class TenantRead(SQLModel):
     roles: list[str]
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class TenantRetrievableRead(SQLModel):
+    id: int
+    name: str
+    description: str | None
+
+    model_config = ConfigDict(from_attributes=True)
+
 
 class TenantReadDetails(TenantRead):
     created_at: datetime

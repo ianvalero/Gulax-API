@@ -1,5 +1,6 @@
-from fastapi import APIRouter, Depends, status, Query
 from typing import Annotated
+
+from fastapi import APIRouter, Depends, status, Query
 from sqlmodel import Session
 
 from app.database import get_session
@@ -24,7 +25,7 @@ async def get_knowledge_spaces(
     user: User = Depends(dependencies_auth.get_current_user),
     knowledge_space_service: KnowledgeSpaceService = Depends(dependencies_services.get_knowledge_space_service)
 ):
-    items, total = await knowledge_space_service.get_knowledge_spaces(session=session, user=user, params=params)
+    items, total = await knowledge_space_service.get_manageable_knowledge_spaces(session=session, user=user, params=params)
     pagination = Pagination(
         offset=params.offset,
         limit=params.limit,

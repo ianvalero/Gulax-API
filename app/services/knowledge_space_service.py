@@ -20,7 +20,7 @@ class KnowledgeSpaceService:
         self.knowledge_repository = KnowledgeSpaceRepository()
         self.logger.info("Knowledge Space Service initialized")
 
-    async def get_knowledge_spaces(
+    async def get_manageable_knowledge_spaces(
         self,
         session: Session,
         user: User,
@@ -42,6 +42,33 @@ class KnowledgeSpaceService:
 
         knowledge_spaces = [
             KnowledgeSpaceSchema.KnowledgeSpaceReadDetail.model_validate(knowledge_space_db)
+            for knowledge_space_db in knowledge_spaces_db
+        ]
+
+        return knowledge_spaces, total
+
+    async def get_retrievable_knowledge_spaces(
+        self,
+        session: Session,
+        user: User,
+        params: KnowledgeSpaceSchema.KnowledgeSpaceRetrievableQueryParams
+    ) -> tuple[list[KnowledgeSpaceSchema.KnowledgeSpaceRetrievableRead], int]:
+        if params.tenant_id:
+            await self.tenant_service.require_retrieval_access(session=session, user=user, tenant_id=params.tenant_id)
+            tenant_ids = [params.tenant_id]
+        else:
+            tenant_ids = await self.tenant_service.get_retrievable_tenant_ids(session=session, user=user)
+            if not tenant_ids:
+                return [], 0
+
+        knowledge_spaces_db, total = self.knowledge_repository.get_knowledge_spaces(
+            session=session,
+            tenant_ids=tenant_ids,
+            params=KnowledgeSpaceSchema.KnowledgeSpaceQueryParams(**params.model_dump()),
+        )
+
+        knowledge_spaces = [
+            KnowledgeSpaceSchema.KnowledgeSpaceRetrievableRead.model_validate(knowledge_space_db)
             for knowledge_space_db in knowledge_spaces_db
         ]
 

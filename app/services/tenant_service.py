@@ -26,7 +26,7 @@ class TenantService:
         user: User,
         params: TenantSchema.TenantQueryParams
     ) -> tuple[list[TenantSchema.TenantReadDetailsWithKnowledgeSpaces | TenantSchema.TenantReadDetails], int]:
-        tenants_db, total = self.tenant_repository.get_tenants(
+        tenants_db, total = self.tenant_repository.get_manageable_tenants(
             session=session,
             roles=user.roles,
             params=params,
@@ -43,6 +43,25 @@ class TenantService:
                 TenantSchema.TenantReadDetails.model_validate(tenant_db)
                 for tenant_db in tenants_db
             ]
+
+        return tenants, total
+
+    async def get_retrievable_tenants(
+        self,
+        session: Session,
+        user: User,
+        params: TenantSchema.TenantRetrievableQueryParams
+    ) -> tuple[list[TenantSchema.TenantRetrievableRead], int]:
+        tenants_db, total = self.tenant_repository.get_retrieval_tenants(
+            session=session,
+            roles=user.roles,
+            params=TenantSchema.TenantQueryParams(**params.model_dump()),
+        )
+
+        tenants = [
+            TenantSchema.TenantRetrievableRead.model_validate(tenant_db)
+            for tenant_db in tenants_db
+        ]
 
         return tenants, total
 

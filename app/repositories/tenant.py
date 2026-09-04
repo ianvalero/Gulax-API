@@ -21,52 +21,38 @@ TENANT_SORT_COLUMNS = {
 }
 
 class TenantRepository:
-    def get_tenants(
+    def get_manageable_tenants(
         self,
         session: Session,
         roles: list[str],
         params: TenantQueryParams,
         is_admin: bool = False,
     ) -> tuple[list[TenantDB], int]:
+        where_conditions = [*self.__generate_filters(filters=params),]
+
+        if not is_admin:
+            where_conditions.append(TenantDB.roles.overlap(roles))
+
+        return self.__get_tenants(session=session, params=params, where_conditions=where_conditions)
+
+    def get_retrieval_tenants(
+        self,
+        session: Session,
+        roles: list[str],
+        params: TenantQueryParams,
+    ) -> tuple[list[TenantDB], int]:
         where_conditions = [
-            *self.__base_conditions(roles=roles, is_admin=is_admin),
-            *self.__generate_filters(filters=params)
+            or_(TenantDB.roles.overlap(roles), TenantDB.is_global_retrieval.is_(True)),
+            *self.__generate_filters(filters=params),
         ]
 
-        tenants_statement = select(TenantDB).where(*where_conditions)
-
-        if params.include_knowledge_spaces:
-            tenants_statement = tenants_statement.options(
-                selectinload(TenantDB.knowledge_spaces),
-                with_loader_criteria(
-                    KnowledgeSpaceDB,
-                    KnowledgeSpaceDB.deleted_at.is_(None),
-                )
-            )
-
-        tenants_statement = sort_data(
-            statement=tenants_statement,
-            sort_column=TENANT_SORT_COLUMNS[params.sort_by],
-            direction=params.sort_order,
-            tie_breaker=TenantDB.id,
-        )
-        tenants_statement = tenants_statement.offset(params.offset).limit(params.limit)
-
-        total_statement = (
-            select(func.count())
-            .select_from(TenantDB)
-            .where(*where_conditions)
-        )
-
-        tenants = cast(list[TenantDB], session.exec(tenants_statement).all())
-        total = cast(int, session.exec(total_statement).one())
-        return tenants, total
+        return self.__get_tenants(session=session, params=params, where_conditions=where_conditions)
 
     def get_manageable_tenant_ids(self, session: Session, roles: list[str], is_admin: bool = False) -> list[int]:
-        where_conditions = [
-            TenantDB.deleted_at.is_(None),
-            *self.__base_conditions(roles=roles, is_admin=is_admin)
-        ]
+        where_conditions = [TenantDB.deleted_at.is_(None)]
+
+        if not is_admin:
+            where_conditions.append(TenantDB.roles.overlap(roles))
 
         statement = select(TenantDB.id).where(*where_conditions)
         return list(session.exec(statement).all())
@@ -123,11 +109,40 @@ class TenantRepository:
         session.flush()
         return True
 
-    def __base_conditions(self, roles: list[str], is_admin: bool) -> list:
-        if is_admin:
-            return []
+    def __get_tenants(
+        self,
+        session: Session,
+        params: TenantQueryParams,
+        where_conditions: list
+    ) -> tuple[list[TenantDB], int]:
+        tenants_statement = select(TenantDB).where(*where_conditions)
 
-        return [TenantDB.roles.overlap(roles)]
+        if params.include_knowledge_spaces:
+            tenants_statement = tenants_statement.options(
+                selectinload(TenantDB.knowledge_spaces),
+                with_loader_criteria(
+                    KnowledgeSpaceDB,
+                    KnowledgeSpaceDB.deleted_at.is_(None),
+                )
+            )
+
+        tenants_statement = sort_data(
+            statement=tenants_statement,
+            sort_column=TENANT_SORT_COLUMNS[params.sort_by],
+            direction=params.sort_order,
+            tie_breaker=TenantDB.id,
+        )
+        tenants_statement = tenants_statement.offset(params.offset).limit(params.limit)
+
+        total_statement = (
+            select(func.count())
+            .select_from(TenantDB)
+            .where(*where_conditions)
+        )
+
+        tenants = cast(list[TenantDB], session.exec(tenants_statement).all())
+        total = cast(int, session.exec(total_statement).one())
+        return tenants, total
 
     def __generate_filters(self, filters: TenantQueryParams | None = None) -> list:
         where_conditions = []
